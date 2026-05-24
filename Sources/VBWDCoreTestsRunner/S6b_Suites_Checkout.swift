@@ -1,0 +1,238 @@
+import Foundation
+import SwiftUI
+import VBWDCore
+import VBWDCoreTestKit
+
+func registerCheckoutSuites(_ runner: TestRunner) {
+
+    // MARK: S6c — BuyTokensViewModel + Bundles
+
+    runner.suite("S6c BuyTokensViewModel") { s in
+
+        nonisolated(unsafe) let okRouter: SpyAPIClient.Router = { path, _, _ in
+            if path == "/token-bundles" {
+                return (200, Data(#"""
+                {"bundles":[
+                  {"id":"b1","name":"Starter","slug":"starter","token_amount":100,"price":"9.99","currency":"USD","is_active":true,"sort_order":2},
+                  {"id":"b2","name":"Pro","slug":"pro","token_amount":500,"price":"39.99","currency":"USD","is_active":true,"sort_order":1}
+                ]}
+                """#.utf8))
+            }
+            return (404, Data())
+        }
+
+        await s.test("load_fetchesBundles") { @MainActor in
+            let spy = SpyAPIClient(router: okRouter)
+            let vm = BuyTokensViewModel(api: spy)
+            await vm.load()
+            s.expectEqual(vm.bundles.count, 2)
+            s.expect(!vm.isLoading)
+        }
+
+        await s.test("load_bundlesSortedBySortOrder") { @MainActor in
+            let spy = SpyAPIClient(router: okRouter)
+            let vm = BuyTokensViewModel(api: spy)
+            await vm.load()
+            // Pro (sort_order 1) should come before Starter (sort_order 2)
+            s.expectEqual(vm.bundles.first?.name, "Pro")
+            s.expectEqual(vm.bundles.last?.name, "Starter")
+        }
+
+        await s.test("load_failure_toleratedWithEmptyList") { @MainActor in
+            let router: SpyAPIClient.Router = { _, _, _ in (500, Data()) }
+            let vm = BuyTokensViewModel(api: SpyAPIClient(router: router))
+            await vm.load()
+            s.expect(vm.bundles.isEmpty)
+            s.expect(!vm.isLoading)
+        }
+
+        await s.test("retry_reloadsData") { @MainActor in
+            let spy = SpyAPIClient(router: okRouter)
+            let vm = BuyTokensViewModel(api: spy)
+            await vm.load()
+            let firstCount = spy.calls.count
+            await vm.retry()
+            s.expect(spy.calls.count > firstCount)
+        }
+
+        await s.test("bundleConformsToCheckoutItem") { @MainActor in
+            let spy = SpyAPIClient(router: okRouter)
+            let vm = BuyTokensViewModel(api: spy)
+            await vm.load()
+            guard let bundle = vm.bundles.first else {
+                s.expect(false, "no bundles loaded")
+                return
+            }
+            let item: any CheckoutItem = bundle
+            s.expectEqual(item.checkoutItemId, bundle.id)
+            s.expectEqual(item.checkoutItemName, bundle.name)
+            s.expectEqual(item.checkoutItemPrice, bundle.price)
+            s.expectEqual(item.checkoutItemCurrency, "USD")
+            s.expectEqual(item.checkoutItemQuantity, 1)
+        }
+    }
+
+    // MARK: S6d — CheckoutViewModel
+
+    runner.suite("S6d CheckoutViewModel") { s in
+
+        nonisolated(unsafe) let paymentMethodsRouter: SpyAPIClient.Router = { path, _, _ in
+            if path == "/settings/payment-methods" {
+                return (200, Data(#"""
+                {"payment_methods":[
+                  {"id":"pm1","code":"stripe","name":"Stripe","icon":null,"is_active":true},
+                  {"id":"pm2","code":"paypal","name":"PayPal","icon":"dollarsign.circle.fill","is_active":true}
+                ]}
+                """#.utf8))
+            }
+            if path == "/user/checkout" {
+                return (200, Data(#"{"invoice_id":"inv-123","status":"pending"}"#.utf8))
+            }
+            return (404, Data())
+        }
+
+        struct StubItem: CheckoutItem {
+            let checkoutItemId: String
+            let checkoutItemName: String
+            let checkoutItemPrice: String
+            let checkoutItemCurrency: String
+            let checkoutItemQuantity: Int
+        }
+
+        let testItems: [any CheckoutItem] = [
+            StubItem(checkoutItemId: "b1", checkoutItemName: "Starter",
+                     checkoutItemPrice: "9.99", checkoutItemCurrency: "USD",
+                     checkoutItemQuantity: 1),
+            StubItem(checkoutItemId: "b2", checkoutItemName: "Pro",
+                     checkoutItemPrice: "39.99", checkoutItemCurrency: "USD",
+                     checkoutItemQuantity: 1),
+        ]
+
+        await s.test("loadPaymentMethods_fetchesFromAPI") { @MainActor in
+            let spy = SpyAPIClient(router: paymentMethodsRouter)
+            let vm = CheckoutViewModel(api: spy, items: testItems)
+            await vm.loadPaymentMethods()
+            s.expectEqual(vm.paymentMethods.count, 2)
+            s.expectEqual(vm.paymentMethods.first?.code, "stripe")
+            s.expect(!vm.isLoading)
+        }
+
+        await s.test("loadPaymentMethods_failure_toleratedWithEmptyList") { @MainActor in
+            let router: SpyAPIClient.Router = { _, _, _ in (500, Data()) }
+            let vm = CheckoutViewModel(api: SpyAPIClient(router: router), items: testItems)
+            await vm.loadPaymentMethods()
+            s.expect(vm.paymentMethods.isEmpty)
+            s.expect(!vm.isLoading)
+        }
+
+        await s.test("orderTotal_computedFromItems") { @MainActor in
+            let spy = SpyAPIClient(router: paymentMethodsRouter)
+            let vm = CheckoutViewModel(api: spy, items: testItems)
+            // 9.99 + 39.99 = 49.98
+            let total = vm.orderTotal
+            s.expect(abs(total - 49.98) < 0.01, "expected ~49.98, got \(total)")
+        }
+
+        await s.test("currency_fromFirstItem") { @MainActor in
+            let spy = SpyAPIClient(router: paymentMethodsRouter)
+            let vm = CheckoutViewModel(api: spy, items: testItems)
+            s.expectEqual(vm.currency, "USD")
+        }
+
+        await s.test("canSubmit_falseWhenNoMethodSelected") { @MainActor in
+            let spy = SpyAPIClient(router: paymentMethodsRouter)
+            let vm = CheckoutViewModel(api: spy, items: testItems)
+            s.expect(!vm.canSubmit)
+        }
+
+        await s.test("canSubmit_trueWhenMethodSelected") { @MainActor in
+            let spy = SpyAPIClient(router: paymentMethodsRouter)
+            let vm = CheckoutViewModel(api: spy, items: testItems)
+            vm.selectedMethodId = "stripe"
+            s.expect(vm.canSubmit)
+        }
+
+        await s.test("submit_postsCheckoutRequest") { @MainActor in
+            let spy = SpyAPIClient(router: paymentMethodsRouter)
+            let vm = CheckoutViewModel(api: spy, items: testItems)
+            vm.selectedMethodId = "stripe"
+            await vm.submit()
+            s.expectNotNil(vm.checkoutResult)
+            s.expectEqual(vm.checkoutResult?.invoiceId, "inv-123")
+            s.expectEqual(vm.checkoutResult?.status, "pending")
+            s.expectNil(vm.errorMessage)
+            s.expect(!vm.isSubmitting)
+            // Verify POST was made
+            let postCalls = spy.calls.filter { $0.method == .post && $0.path == "/user/checkout" }
+            s.expectEqual(postCalls.count, 1)
+        }
+
+        await s.test("submit_failure_setsErrorMessage") { @MainActor in
+            let router: SpyAPIClient.Router = { path, method, body in
+                if path == "/user/checkout" && method == .post {
+                    return (400, Data(#"{"error":"Invalid checkout"}"#.utf8))
+                }
+                return paymentMethodsRouter(path, method, body)
+            }
+            let vm = CheckoutViewModel(api: SpyAPIClient(router: router), items: testItems)
+            vm.selectedMethodId = "stripe"
+            await vm.submit()
+            s.expectNil(vm.checkoutResult)
+            s.expectNotNil(vm.errorMessage)
+            s.expect(!vm.isSubmitting)
+        }
+
+        await s.test("submit_withoutSelectedMethod_doesNothing") { @MainActor in
+            let spy = SpyAPIClient(router: paymentMethodsRouter)
+            let vm = CheckoutViewModel(api: spy, items: testItems)
+            // selectedMethodId is nil
+            await vm.submit()
+            s.expectNil(vm.checkoutResult)
+            let postCalls = spy.calls.filter { $0.method == .post }
+            s.expect(postCalls.isEmpty)
+        }
+
+        await s.test("isSubmitting_falseAfterSubmit") { @MainActor in
+            let spy = SpyAPIClient(router: paymentMethodsRouter)
+            let vm = CheckoutViewModel(api: spy, items: testItems)
+            s.expect(!vm.isSubmitting)
+            vm.selectedMethodId = "stripe"
+            await vm.submit()
+            s.expect(!vm.isSubmitting)
+        }
+    }
+
+    // MARK: S6e — ComponentRegistry.checkoutComponents
+
+    runner.suite("S6e ComponentRegistry.checkoutComponents") { s in
+
+        await s.test("returnsOnlyCheckoutPrefixedComponents") { @MainActor in
+            let registry = ComponentRegistry()
+            registry.add("DashboardWeather") { AnyView(EmptyView()) }
+            registry.add("CheckoutDiscount") { AnyView(EmptyView()) }
+            registry.add("ProfileBio") { AnyView(EmptyView()) }
+            registry.add("CheckoutShipping") { AnyView(EmptyView()) }
+
+            let checkout = registry.checkoutComponents()
+            s.expectEqual(checkout.count, 2)
+            s.expectEqual(checkout[0].name, "CheckoutDiscount")
+            s.expectEqual(checkout[1].name, "CheckoutShipping")
+        }
+
+        await s.test("emptyWhenNoCheckoutComponents") { @MainActor in
+            let registry = ComponentRegistry()
+            registry.add("DashboardWeather") { AnyView(EmptyView()) }
+            let checkout = registry.checkoutComponents()
+            s.expect(checkout.isEmpty)
+        }
+
+        await s.test("respectsRegistrationOrder") { @MainActor in
+            let registry = ComponentRegistry()
+            registry.add("CheckoutB") { AnyView(EmptyView()) }
+            registry.add("CheckoutA") { AnyView(EmptyView()) }
+            registry.add("CheckoutC") { AnyView(EmptyView()) }
+            let names = registry.checkoutComponents().map(\.name)
+            s.expectEqual(names, ["CheckoutB", "CheckoutA", "CheckoutC"])
+        }
+    }
+}

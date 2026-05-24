@@ -28,9 +28,10 @@ func registerCompositionSuites(_ runner: TestRunner) {
             s.expectEqual(c.session.state, .signedOut)
         }
         await s.test("container_baseURL_defaultsToLocalBackend") { @MainActor in
+            // No vbwd_config.json in test runner bundle → falls back to defaultBaseURL
             let c = SDKContainer(tokenStore: InMemoryTokenStore())
             s.expectEqual(c.config.baseURL.absoluteString,
-                          "https://vbwd.cc/api/v1")
+                          "http://localhost:5000/api/v1")
         }
         await s.test("container_baseURL_overridable") { @MainActor in
             let url = URL(string: "https://api.prod.example/api/v1")!
@@ -51,6 +52,28 @@ func registerCompositionSuites(_ runner: TestRunner) {
             _ = c.makeLoginViewModel()
             _ = c.makeDashboardViewModel(user: Fixtures.user())
             s.expect(true) // construction did not trap
+        }
+    }
+
+    // MARK: S10 — VBWDConfig
+    runner.suite("S10 VBWDConfig") { s in
+        await s.test("decode_validJSON") {
+            let json = #"{"api_base_url":"http://localhost:5000/api/v1"}"#
+            let config = try JSONDecoder().decode(VBWDConfig.self,
+                                                  from: Data(json.utf8))
+            s.expectEqual(config.apiBaseUrl, "http://localhost:5000/api/v1")
+            s.expectEqual(config.baseURL.absoluteString, "http://localhost:5000/api/v1")
+        }
+
+        await s.test("baseURL_malformedString_fallsBackToDefault") {
+            let config = VBWDConfig(apiBaseUrl: "")
+            s.expectEqual(config.baseURL, SDKContainer.defaultBaseURL)
+        }
+
+        await s.test("load_missingFile_returnsNil") {
+            // Test runner bundle has no vbwd_config.json
+            let result = VBWDConfig.load()
+            s.expectNil(result)
         }
     }
 }

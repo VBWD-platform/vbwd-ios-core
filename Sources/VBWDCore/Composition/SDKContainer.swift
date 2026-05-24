@@ -5,8 +5,8 @@ import Foundation
 /// protocols and is constructor-injected (DIP / DI compliance).
 @MainActor
 public final class SDKContainer {
-    /// Dev backend (same local Docker backend the web apps use).
-    nonisolated public static let defaultBaseURL = URL(string: "https://vbwd.cc/api/v1")!
+    /// Fallback when no `vbwd_config.json` is bundled.
+    nonisolated public static let defaultBaseURL = URL(string: "http://localhost:5000/api/v1")!
 
     public let config: APIClientConfig
     private let tokenProvider: AuthTokenProvider
@@ -17,13 +17,15 @@ public final class SDKContainer {
     public let themeManager: ThemeManager
 
     /// - Parameters:
-    ///   - baseURL: API base; defaults to the local backend, overridable for
-    ///     prod / physical-device (LAN IP).
+    ///   - baseURL: API base; defaults to `vbwd_config.json` → `defaultBaseURL`.
     ///   - tokenStore: injectable; defaults to Keychain on device, but tests/
     ///     previews can pass `InMemoryTokenStore()`.
-    public init(baseURL: URL = SDKContainer.defaultBaseURL,
+    public init(baseURL: URL? = nil,
                 tokenStore: TokenStore? = nil) {
-        self.config = APIClientConfig(baseURL: baseURL)
+        let resolvedURL = baseURL
+            ?? VBWDConfig.load()?.baseURL
+            ?? SDKContainer.defaultBaseURL
+        self.config = APIClientConfig(baseURL: resolvedURL)
         let provider = MutableTokenProvider()
         self.tokenProvider = provider
         self.apiClient = URLSessionAPIClient(config: config, tokenProvider: provider)
@@ -52,8 +54,17 @@ public final class SDKContainer {
         TokensViewModel(api: apiClient)
     }
 
+    func makeBuyTokensViewModel() -> BuyTokensViewModel {
+        BuyTokensViewModel(api: apiClient)
+    }
+
     func makeInvoicesViewModel() -> InvoicesViewModel {
         InvoicesViewModel(api: apiClient)
+    }
+
+    func makeCheckoutViewModel(items: [any CheckoutItem],
+                               components: ComponentRegistry? = nil) -> CheckoutViewModel {
+        CheckoutViewModel(api: apiClient, items: items, components: components)
     }
 
     /// Builds the plugin composition root. `manifestLoader` defaults to the

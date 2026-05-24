@@ -100,7 +100,7 @@ func registerSessionUISuites(_ runner: TestRunner) {
     // MARK: S9 — DashboardViewModel
     runner.suite("S9 DashboardViewModel") { s in
         nonisolated(unsafe) let okRouter: SpyAPIClient.Router = { path, _, _ in
-            if path == "/invoices/" {
+            if path == "/user/invoices" {
                 return (200, Data(#"""
                 {"invoices":[
                   {"id":"1","invoice_number":"INV-1","amount":"10","status":"paid"},
@@ -126,7 +126,7 @@ func registerSessionUISuites(_ runner: TestRunner) {
             let vm = DashboardViewModel(user: Fixtures.user(), api: spy)
             await vm.load()
             let paths = Set(spy.calls.map { $0.path })
-            s.expect(paths.contains("/invoices/"))
+            s.expect(paths.contains("/user/invoices"))
             s.expect(paths.contains("/user/tokens/balance"))
             s.expect(paths.contains { $0.hasPrefix("/user/tokens/transactions") })
             s.expectEqual(vm.tokenBalance, 42)
@@ -136,7 +136,7 @@ func registerSessionUISuites(_ runner: TestRunner) {
 
         await s.test("load_invoiceFailure_doesNotFailScreen") { @MainActor in
             let router: SpyAPIClient.Router = { path, m, b in
-                path == "/invoices/" ? (500, Data()) : okRouter(path, m, b)
+                path == "/user/invoices" ? (500, Data()) : okRouter(path, m, b)
             }
             let vm = DashboardViewModel(user: Fixtures.user(), api: SpyAPIClient(router: router))
             await vm.load()

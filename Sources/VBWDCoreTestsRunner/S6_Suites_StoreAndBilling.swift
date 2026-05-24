@@ -91,7 +91,7 @@ func registerStoreAndBillingSuites(_ runner: TestRunner) {
     runner.suite("S6b InvoicesViewModel") { s in
 
         nonisolated(unsafe) let okRouter: SpyAPIClient.Router = { path, _, _ in
-            if path == "/invoices/" {
+            if path == "/user/invoices" {
                 return (200, Data(#"""
                 {"invoices":[
                   {"id":"1","invoice_number":"INV-1","invoiced_at":"2026-01-01","amount":"10.00","status":"paid"},

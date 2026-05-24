@@ -68,6 +68,14 @@ public struct AppRoot: View {
             SettingsScreen()
         case "/store/tokens":
             TokensView(viewModel: container.makeTokensViewModel())
+        case "/store/buy-tokens":
+            BuyTokensView(
+                viewModel: container.makeBuyTokensViewModel(),
+                checkoutViewModelFactory: { items in
+                    container.makeCheckoutViewModel(
+                        items: items, components: host.components)
+                }
+            )
         case "/billing/invoices":
             InvoicesView(viewModel: container.makeInvoicesViewModel())
         case let route?:

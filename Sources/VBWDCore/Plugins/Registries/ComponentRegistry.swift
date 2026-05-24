@@ -43,4 +43,12 @@ public final class ComponentRegistry {
         order.filter { $0.hasPrefix("Profile") }
              .compactMap { n in components[n].map { (n, $0) } }
     }
+
+    /// Checkout extension convention: components named `Checkout*`,
+    /// in registration order. Plugins register these to inject sections into
+    /// the checkout screen (e.g. discount codes, shipping, insurance).
+    public func checkoutComponents() -> [(name: String, factory: ComponentFactory)] {
+        order.filter { $0.hasPrefix("Checkout") }
+             .compactMap { n in components[n].map { (n, $0) } }
+    }
 }

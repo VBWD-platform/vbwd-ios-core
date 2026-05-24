@@ -47,6 +47,7 @@ func runAll() async -> Int32 {
 
     // Sprint 06
     registerStoreAndBillingSuites(runner)  // 6.0
+    registerCheckoutSuites(runner)        // 6.1
 
     return await runner.run()
 }

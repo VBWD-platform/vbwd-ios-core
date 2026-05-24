@@ -22,6 +22,10 @@ public enum AppEvents {
     public static let paymentSucceeded = "payment:succeeded"
     public static let paymentFailed = "payment:failed"
     public static let paymentRefunded = "payment:refunded"
+    // Checkout
+    public static let checkoutStarted = "checkout:started"
+    public static let checkoutCompleted = "checkout:completed"
+    public static let checkoutFailed = "checkout:failed"
     // Plugin lifecycle
     public static let pluginRegistered = "plugin:registered"
     public static let pluginInitialized = "plugin:initialized"

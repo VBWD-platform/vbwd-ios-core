@@ -80,6 +80,14 @@ public struct SideMenu: View {
                                 onClose()
                             }
                         )
+                        MenuItemButton(
+                            icon: "cart.fill",
+                            title: "Buy Tokens",
+                            action: {
+                                host.selectedRoute = "/store/buy-tokens"
+                                onClose()
+                            }
+                        )
                     }
 
                     // Billing section (permission-gated)
