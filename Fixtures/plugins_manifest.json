@@ -1,0 +1,34 @@
+{
+  "plugins": {
+    "booking": {
+      "enabled": true,
+      "installedAt": "2026-03-19T15:54:42.122Z",
+      "source": "local",
+      "version": "0.1.0"
+    },
+    "chat": {
+      "enabled": true,
+      "installedAt": "2026-02-13T14:00:00.000Z",
+      "source": "local",
+      "version": "1.0.0"
+    },
+    "checkout": {
+      "enabled": true,
+      "installedAt": "2026-02-09T09:28:16.651Z",
+      "source": "local",
+      "version": "1.0.0"
+    },
+    "example": {
+      "enabled": true,
+      "installedAt": "2026-05-16T00:00:00.000Z",
+      "source": "local",
+      "version": "1.0.0"
+    },
+    "disabledsample": {
+      "enabled": false,
+      "installedAt": "2026-05-16T00:00:00.000Z",
+      "source": "local",
+      "version": "1.0.0"
+    }
+  }
+}

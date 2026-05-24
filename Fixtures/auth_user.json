@@ -1,0 +1,24 @@
+{
+  "access_levels": [],
+  "email": "test@example.com",
+  "id": "31c0e59c-aae5-4eba-9328-98b99370bf32",
+  "is_admin": false,
+  "name": "John Bach",
+  "permissions": [],
+  "role": "USER",
+  "user_access_levels": [
+    {
+      "id": "d63cb59f-805e-47eb-aa86-1a413fb92834",
+      "name": "Logged In",
+      "slug": "logged-in"
+    }
+  ],
+  "user_permissions": [
+    "cms.content.view",
+    "subscription.invoices.view",
+    "subscription.plans.view",
+    "subscription.tokens.view",
+    "user.profile.manage",
+    "user.profile.view"
+  ]
+}
