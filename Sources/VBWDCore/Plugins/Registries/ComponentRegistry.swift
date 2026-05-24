@@ -35,4 +35,12 @@ public final class ComponentRegistry {
         order.filter { $0.hasPrefix("Dashboard") }
              .compactMap { n in components[n].map { (n, $0) } }
     }
+
+    /// Profile extension convention: components named `Profile*`,
+    /// in registration order. Plugins register these to add sections to the
+    /// profile screen (mirrors the `Dashboard*` pattern).
+    public func profileComponents() -> [(name: String, factory: ComponentFactory)] {
+        order.filter { $0.hasPrefix("Profile") }
+             .compactMap { n in components[n].map { (n, $0) } }
+    }
 }

@@ -66,6 +66,10 @@ public struct AppRoot: View {
                             user: user)
         case "/settings":
             SettingsScreen()
+        case "/store/tokens":
+            TokensView(viewModel: container.makeTokensViewModel())
+        case "/billing/invoices":
+            InvoicesView(viewModel: container.makeInvoicesViewModel())
         case let route?:
             if let pluginRoute = host.routes.first(where: { $0.path == route }) {
                 pluginRoute.view()

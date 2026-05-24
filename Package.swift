@@ -15,22 +15,11 @@ let package = Package(
     ],
     products: [
         .library(name: "VBWDCore", targets: ["VBWDCore"]),
-        .library(name: "ExamplePlugin", targets: ["ExamplePlugin"]),
     ],
     targets: [
         .target(
             name: "VBWDCore",
             path: "Sources/VBWDCore",
-            swiftSettings: [
-                .enableUpcomingFeature("StrictConcurrency")
-            ]
-        ),
-        // Reference plugin (Sprint 02 / 2.6). Depends ONLY on the public SDK —
-        // proof a third-party plugin needs nothing internal (OCP/ISP).
-        .target(
-            name: "ExamplePlugin",
-            dependencies: ["VBWDCore"],
-            path: "Sources/ExamplePlugin",
             swiftSettings: [
                 .enableUpcomingFeature("StrictConcurrency")
             ]
@@ -44,7 +33,7 @@ let package = Package(
         ),
         .executableTarget(
             name: "VBWDCoreTestsRunner",
-            dependencies: ["VBWDCore", "VBWDCoreTestKit", "ExamplePlugin"],
+            dependencies: ["VBWDCore", "VBWDCoreTestKit"],
             path: "Sources/VBWDCoreTestsRunner",
             swiftSettings: [
                 .swiftLanguageMode(.v5)

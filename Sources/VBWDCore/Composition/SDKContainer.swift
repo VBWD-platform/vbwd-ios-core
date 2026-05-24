@@ -48,6 +48,14 @@ public final class SDKContainer {
         return ProfileViewModel(service: service)
     }
 
+    func makeTokensViewModel() -> TokensViewModel {
+        TokensViewModel(api: apiClient)
+    }
+
+    func makeInvoicesViewModel() -> InvoicesViewModel {
+        InvoicesViewModel(api: apiClient)
+    }
+
     /// Builds the plugin composition root. `manifestLoader` defaults to the
     /// remote loader (backend single writer, configurable path) with a bundled
     /// fallback; pass `InMemoryPluginManifestLoader` for tests/previews.

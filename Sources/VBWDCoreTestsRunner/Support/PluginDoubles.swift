@@ -44,9 +44,40 @@ final class SpyPlugin: Plugin, @unchecked Sendable {
     func uninstall() async throws { calls.append("uninstall") }
 }
 
+/// A plugin test double that registers routes, widgets, translations —
+/// exercises every PlatformSDK seam, so PluginHost integration tests can
+/// run without importing the real ExamplePlugin package.
+final class RichSpyPlugin: Plugin, @unchecked Sendable {
+    let metadata = PluginMetadata(
+        name: "rich-spy",
+        version: SemanticVersion(1, 0, 0),
+        description: "Test double exercising all SDK seams.",
+        translations: ["en": ["rich.title": "Rich"]]
+    )
+    private(set) var active = false
+
+    func install(_ sdk: PlatformSDK) async throws {
+        try sdk.addRoute(PluginRoute(
+            path: "/rich", name: "rich",
+            view: { AnyView(Text("rich")) }))
+        try sdk.addRoute(PluginRoute(
+            path: "/rich/secret", name: "rich-secret",
+            requiresAuth: true,
+            requiredUserPermission: "user.profile.view",
+            view: { AnyView(Text("secret")) }))
+        sdk.addComponent("DashboardRich") { AnyView(Text("Rich Widget")) }
+        try sdk.createStore("richStore", CounterStore())
+        sdk.addTranslations("en", ["rich.title": "Rich"])
+        sdk.addTranslations("de", ["rich.title": "Reich"])
+    }
+    func activate() async throws { active = true }
+    func deactivate() async throws { active = false }
+    func uninstall() async throws { active = false }
+}
+
 /// Reusable Liskov suite: any `Plugin` must observe the install→activate→
-/// deactivate sequence and expose metadata. Called for `SpyPlugin` (2.4) and
-/// the real `ExamplePlugin` (2.6) — same contract.
+/// deactivate sequence and expose metadata. Called for `SpyPlugin` (2.4)
+/// and `RichSpyPlugin` — same contract.
 func registerPluginContract(_ runner: TestRunner, _ label: String,
                             _ make: @Sendable @escaping () -> Plugin) {
     runner.suite("PluginContract: \(label)") { s in

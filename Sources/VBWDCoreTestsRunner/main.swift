@@ -45,6 +45,9 @@ func runAll() async -> Int32 {
     registerBuiltInThemeSuites(runner)     // 5.1
     registerThemeManagerSuites(runner)     // 5.2
 
+    // Sprint 06
+    registerStoreAndBillingSuites(runner)  // 6.0
+
     return await runner.run()
 }
 

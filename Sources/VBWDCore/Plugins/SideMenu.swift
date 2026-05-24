@@ -1,7 +1,7 @@
 import SwiftUI
 
 /// Side drawer menu content with header, core items, plugin items, and logout.
-/// Sprint 05: uses theme colors.
+/// Sprint 05: uses theme colors. Sprint 06: Store + Billing sections.
 public struct SideMenu: View {
     let onClose: () -> Void
     @EnvironmentObject var session: AuthSession
@@ -12,6 +12,22 @@ public struct SideMenu: View {
     public init(onClose: @escaping () -> Void) {
         self.onClose = onClose
     }
+
+    // MARK: - Permission helpers
+
+    private var permissions: [String] {
+        session.currentUser?.userPermissions ?? []
+    }
+
+    private var canViewTokens: Bool {
+        PermissionEvaluator().has("subscription.tokens.view", in: permissions)
+    }
+
+    private var canViewInvoices: Bool {
+        PermissionEvaluator().has("subscription.invoices.view", in: permissions)
+    }
+
+    // MARK: - Body
 
     public var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -52,6 +68,34 @@ public struct SideMenu: View {
                         }
                     )
 
+                    // Store section (permission-gated)
+                    if canViewTokens {
+                        Divider().padding(.vertical, 8)
+                        MenuSectionHeader(title: "Store")
+                        MenuItemButton(
+                            icon: "circle.dotted.circle",
+                            title: "Tokens",
+                            action: {
+                                host.selectedRoute = "/store/tokens"
+                                onClose()
+                            }
+                        )
+                    }
+
+                    // Billing section (permission-gated)
+                    if canViewInvoices {
+                        Divider().padding(.vertical, 8)
+                        MenuSectionHeader(title: "Billing")
+                        MenuItemButton(
+                            icon: "doc.text.fill",
+                            title: "Invoices",
+                            action: {
+                                host.selectedRoute = "/billing/invoices"
+                                onClose()
+                            }
+                        )
+                    }
+
                     Divider()
                         .padding(.vertical, 8)
 
@@ -83,5 +127,22 @@ public struct SideMenu: View {
         .shadow(radius: 10)
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("side_menu")
+    }
+}
+
+// MARK: - Section Header
+
+private struct MenuSectionHeader: View {
+    let title: String
+    @Environment(\.appTheme) var theme
+
+    var body: some View {
+        Text(title.uppercased())
+            .font(.caption)
+            .fontWeight(.semibold)
+            .foregroundColor(theme.textSecondary)
+            .padding(.horizontal)
+            .padding(.top, 4)
+            .padding(.bottom, 4)
     }
 }

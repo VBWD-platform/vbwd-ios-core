@@ -7,6 +7,7 @@ struct ProfileEditView: View {
     @ObservedObject var viewModel: ProfileViewModel
     let user: AuthUser
     @Environment(\.isMenuOpen) var isMenuOpen
+    @EnvironmentObject var host: PluginHost
 
     /// ISO 3166-1 alpha-2 codes → display names. The backend stores country as
     /// the two-letter code (e.g. "DE"), so Picker tags must match.
@@ -172,6 +173,12 @@ struct ProfileEditView: View {
                     }
                 }
                 .accessibilityIdentifier("profile_change_password_button")
+            }
+
+            // Plugin-contributed Profile* sections
+            let pluginSections = host.components.profileComponents()
+            ForEach(pluginSections, id: \.name) { section in
+                section.factory()
             }
         }
     }

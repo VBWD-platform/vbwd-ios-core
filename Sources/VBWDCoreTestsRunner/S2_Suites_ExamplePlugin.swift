@@ -1,7 +1,6 @@
 import Foundation
 import SwiftUI
 import VBWDCore
-import ExamplePlugin
 import VBWDCoreTestKit
 
 /// The minimal plugin from PLUGIN-GUIDE.md — a *compiled, tested* type so the
@@ -19,54 +18,39 @@ final class MinimalGuidePlugin: Plugin, @unchecked Sendable {
 
 func registerExamplePluginSuites(_ runner: TestRunner) {
 
-    runner.suite("P11 ExamplePlugin") { s in
+    // RichSpyPlugin exercises the same SDK seams as ExamplePlugin; verify it
+    // passes the Liskov contract like any real plugin would.
+    registerPluginContract(runner, "RichSpyPlugin") { RichSpyPlugin() }
+
+    // The guide's minimal template is a real type and must also pass.
+    registerPluginContract(runner, "GuideTemplate") { MinimalGuidePlugin() }
+
+    // RichSpyPlugin integration tests (formerly ExamplePlugin tests)
+    runner.suite("P11 RichSpyPlugin") { s in
         await s.test("install_registersRoute_widget_store_translations") { @MainActor in
             let sdk = makeSDK()
-            let p = ExamplePlugin()
+            let p = RichSpyPlugin()
             try await p.install(sdk)
-            s.expect(sdk.getRoutes().contains { $0.path == "/example" })
-            s.expect(sdk.getComponents()["DashboardExample"] != nil)
-            s.expect(sdk.getStores()["exampleStore"] != nil)
-            s.expectEqual(sdk.getTranslations()["en"]?["example.title"], "Example")
-            s.expectEqual(sdk.getTranslations()["de"]?["example.title"], "Beispiel")
+            s.expect(sdk.getRoutes().contains { $0.path == "/rich" })
+            s.expect(sdk.getComponents()["DashboardRich"] != nil)
+            s.expect(sdk.getStores()["richStore"] != nil)
+            s.expectEqual(sdk.getTranslations()["en"]?["rich.title"], "Rich")
+            s.expectEqual(sdk.getTranslations()["de"]?["rich.title"], "Reich")
         }
         await s.test("secretRoute_hasAuthAndPermissionMeta") { @MainActor in
             let sdk = makeSDK()
-            try await ExamplePlugin().install(sdk)
-            let secret = sdk.getRoutes().first { $0.path == "/example/secret" }
+            try await RichSpyPlugin().install(sdk)
+            let secret = sdk.getRoutes().first { $0.path == "/rich/secret" }
             s.expectNotNil(secret)
             s.expectEqual(secret?.requiresAuth, true)
             s.expectEqual(secret?.requiredUserPermission, "user.profile.view")
         }
         await s.test("activate_setsActive_deactivate_clears") { @MainActor in
-            let p = ExamplePlugin()
+            let p = RichSpyPlugin()
             try await p.activate()
-            s.expect(p.store.active)
+            s.expect(p.active)
             try await p.deactivate()
-            s.expect(!p.store.active)
-        }
-        await s.test("subscribes_toAuthLogin_event") { @MainActor in
-            let sdk = makeSDK()
-            let p = ExamplePlugin()
-            try await p.install(sdk)
-            // Yield to let fire-and-forget on() Task register the listener
-            try? await Task.sleep(nanoseconds: 50_000_000)
-            s.expect(!p.store.sawLogin)
-            sdk.events.emit(AppEvents.authLogin, nil)
-            // Yield to let fire-and-forget emit() Task invoke callbacks
-            try? await Task.sleep(nanoseconds: 50_000_000)
-            s.expect(p.store.sawLogin)
-        }
-        await s.test("dependsOnNothingInternal_onlyPublicSDK") {
-            // Compile-time fact: ExamplePlugin is its own target depending only
-            // on VBWDCore (see Package.swift). Runtime sanity:
-            s.expectEqual(ExamplePlugin().metadata.name, "example")
+            s.expect(!p.active)
         }
     }
-
-    // Liskov: the REAL plugin passes the same contract as SpyPlugin (2.4).
-    registerPluginContract(runner, "ExamplePlugin") { ExamplePlugin() }
-
-    // The guide's minimal template is a real type and must also pass.
-    registerPluginContract(runner, "GuideTemplate") { MinimalGuidePlugin() }
 }

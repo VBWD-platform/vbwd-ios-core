@@ -72,3 +72,26 @@ public final class InMemoryPluginManifestLoader: PluginManifestLoader, Sendable 
     public init(_ manifest: PluginManifest) { self.manifest = manifest }
     public func load() async -> PluginManifest { manifest }
 }
+
+/// Loads the manifest from a bundled `plugins.json` file in the app's main
+/// bundle. The host app ships this file to define which plugins are enabled by
+/// default (offline-safe, no backend dependency). Mirrors the web's
+/// `public/plugins.json` convention.
+public final class BundledPluginManifestLoader: PluginManifestLoader, @unchecked Sendable {
+    private let bundle: Bundle
+    private let fileName: String
+
+    public init(bundle: Bundle = .main, fileName: String = "plugins") {
+        self.bundle = bundle
+        self.fileName = fileName
+    }
+
+    public func load() async -> PluginManifest {
+        guard let url = bundle.url(forResource: fileName, withExtension: "json"),
+              let data = try? Data(contentsOf: url),
+              let manifest = try? JSONDecoder().decode(PluginManifest.self, from: data) else {
+            return .empty
+        }
+        return manifest
+    }
+}
