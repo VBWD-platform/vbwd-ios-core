@@ -44,11 +44,7 @@ public struct PaymentMethod: Codable, Equatable, Sendable, Identifiable {
 }
 
 struct PaymentMethodsResponse: Codable {
-    let paymentMethods: [PaymentMethod]?
-
-    enum CodingKeys: String, CodingKey {
-        case paymentMethods = "payment_methods"
-    }
+    let methods: [PaymentMethod]?
 }
 
 // MARK: - Checkout Item Protocol
@@ -96,13 +92,48 @@ public struct CheckoutRequest: Encodable, Sendable {
     }
 }
 
-/// Response from `POST /user/checkout`.
-public struct CheckoutResult: Codable, Sendable {
-    public let invoiceId: String?
+/// Response from `POST /user/checkout`. The backend returns a nested
+/// `invoice` object; we expose convenience accessors at the top level.
+public struct CheckoutResult: Codable, Equatable, Sendable {
+    public let invoice: CheckoutInvoice?
+    public let message: String?
+
+    /// Convenience — the invoice ID needed for Stripe session creation and
+    /// confirmation page navigation.
+    public var invoiceId: String? { invoice?.id }
+    public var status: String? { invoice?.status }
+}
+
+/// Subset of the invoice payload returned by `POST /user/checkout`.
+public struct CheckoutInvoice: Codable, Equatable, Sendable {
+    public let id: String
+    public let invoiceNumber: String?
+    public let amount: String?
+    public let totalAmount: String?
+    public let currency: String?
     public let status: String?
+    public let paymentMethod: String?
+    public let lineItems: [CheckoutLineItem]?
 
     enum CodingKeys: String, CodingKey {
-        case invoiceId = "invoice_id"
-        case status
+        case id, amount, currency, status
+        case invoiceNumber = "invoice_number"
+        case totalAmount = "total_amount"
+        case paymentMethod = "payment_method"
+        case lineItems = "line_items"
+    }
+}
+
+/// Line item in a checkout invoice.
+public struct CheckoutLineItem: Codable, Equatable, Sendable {
+    public let id: String?
+    public let description: String?
+    public let quantity: Int?
+    public let unitPrice: String?
+    public let amount: String?
+
+    enum CodingKeys: String, CodingKey {
+        case id, description, quantity, amount
+        case unitPrice = "unit_price"
     }
 }

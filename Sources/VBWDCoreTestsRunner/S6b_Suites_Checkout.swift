@@ -79,14 +79,14 @@ func registerCheckoutSuites(_ runner: TestRunner) {
         nonisolated(unsafe) let paymentMethodsRouter: SpyAPIClient.Router = { path, _, _ in
             if path == "/settings/payment-methods" {
                 return (200, Data(#"""
-                {"payment_methods":[
+                {"methods":[
                   {"id":"pm1","code":"stripe","name":"Stripe","icon":null,"is_active":true},
                   {"id":"pm2","code":"paypal","name":"PayPal","icon":"dollarsign.circle.fill","is_active":true}
                 ]}
                 """#.utf8))
             }
             if path == "/user/checkout" {
-                return (200, Data(#"{"invoice_id":"inv-123","status":"pending"}"#.utf8))
+                return (200, Data(#"{"invoice":{"id":"inv-123","invoice_number":"INV-TEST","status":"pending","amount":"49.98","currency":"USD"},"message":"Checkout created."}"#.utf8))
             }
             return (404, Data())
         }
@@ -233,6 +233,100 @@ func registerCheckoutSuites(_ runner: TestRunner) {
             registry.add("CheckoutC") { AnyView(EmptyView()) }
             let names = registry.checkoutComponents().map(\.name)
             s.expectEqual(names, ["CheckoutB", "CheckoutA", "CheckoutC"])
+        }
+    }
+
+    // MARK: S6f — ComponentRegistry.supportedPaymentMethodCodes
+
+    runner.suite("S6f ComponentRegistry.supportedPaymentMethodCodes") { s in
+
+        await s.test("extractsCodesFromPaymentMethodPrefix") { @MainActor in
+            let registry = ComponentRegistry()
+            registry.add("PaymentMethodStripe") { AnyView(EmptyView()) }
+            registry.add("PaymentMethodInvoice") { AnyView(EmptyView()) }
+            registry.add("CheckoutDiscount") { AnyView(EmptyView()) }
+            let codes = registry.supportedPaymentMethodCodes()
+            s.expectEqual(codes, Set(["stripe", "invoice"]))
+        }
+
+        await s.test("emptyWhenNoPaymentMethodComponents") { @MainActor in
+            let registry = ComponentRegistry()
+            registry.add("CheckoutShipping") { AnyView(EmptyView()) }
+            let codes = registry.supportedPaymentMethodCodes()
+            s.expect(codes.isEmpty)
+        }
+
+        await s.test("codeIsLowercased") { @MainActor in
+            let registry = ComponentRegistry()
+            registry.add("PaymentMethodPayPal") { AnyView(EmptyView()) }
+            let codes = registry.supportedPaymentMethodCodes()
+            s.expect(codes.contains("paypal"))
+        }
+
+        await s.test("paymentMethodDetail_returnsFactoryForMatchingCode") { @MainActor in
+            let registry = ComponentRegistry()
+            registry.add("PaymentMethodStripe") { AnyView(EmptyView()) }
+            s.expectNotNil(registry.paymentMethodDetail(for: "stripe"))
+        }
+
+        await s.test("paymentMethodDetail_returnsNilForUnknownCode") { @MainActor in
+            let registry = ComponentRegistry()
+            registry.add("PaymentMethodStripe") { AnyView(EmptyView()) }
+            s.expectNil(registry.paymentMethodDetail(for: "paypal"))
+        }
+    }
+
+    // MARK: S6g — CheckoutViewModel filters by plugin support
+
+    runner.suite("S6g CheckoutViewModel paymentMethod filtering") { s in
+
+        nonisolated(unsafe) let allMethodsRouter: SpyAPIClient.Router = { path, _, _ in
+            if path == "/settings/payment-methods" {
+                return (200, Data(#"""
+                {"methods":[
+                  {"id":"pm1","code":"stripe","name":"Stripe","icon":null,"is_active":true},
+                  {"id":"pm2","code":"paypal","name":"PayPal","icon":null,"is_active":true},
+                  {"id":"pm3","code":"invoice","name":"Invoice","icon":null,"is_active":true}
+                ]}
+                """#.utf8))
+            }
+            return (404, Data())
+        }
+
+        struct StubItem: CheckoutItem {
+            let checkoutItemId = "b1"
+            let checkoutItemName = "Test"
+            let checkoutItemPrice = "9.99"
+            let checkoutItemCurrency = "USD"
+            let checkoutItemQuantity = 1
+        }
+
+        await s.test("filtersToOnlyPluginSupportedMethods") { @MainActor in
+            let spy = SpyAPIClient(router: allMethodsRouter)
+            let components = ComponentRegistry()
+            components.add("PaymentMethodStripe") { AnyView(EmptyView()) }
+            components.add("PaymentMethodInvoice") { AnyView(EmptyView()) }
+            let vm = CheckoutViewModel(api: spy, items: [StubItem()], components: components)
+            await vm.loadPaymentMethods()
+            s.expectEqual(vm.paymentMethods.count, 2)
+            let codes = Set(vm.paymentMethods.map(\.code))
+            s.expect(codes.contains("stripe"))
+            s.expect(codes.contains("invoice"))
+            s.expect(!codes.contains("paypal"))
+        }
+
+        await s.test("showsAllMethodsWhenNoPluginsRegistered") { @MainActor in
+            let spy = SpyAPIClient(router: allMethodsRouter)
+            let vm = CheckoutViewModel(api: spy, items: [StubItem()])
+            await vm.loadPaymentMethods()
+            s.expectEqual(vm.paymentMethods.count, 3)
+        }
+
+        await s.test("showsAllMethodsWhenComponentsNil") { @MainActor in
+            let spy = SpyAPIClient(router: allMethodsRouter)
+            let vm = CheckoutViewModel(api: spy, items: [StubItem()], components: nil)
+            await vm.loadPaymentMethods()
+            s.expectEqual(vm.paymentMethods.count, 3)
         }
     }
 }

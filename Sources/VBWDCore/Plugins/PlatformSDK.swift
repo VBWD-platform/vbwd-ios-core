@@ -45,6 +45,9 @@ public protocol PlatformSDK: AnyObject, Sendable {
     func addMenuItem(_ item: MenuItem)
     func removeMenuItem(_ id: String)
     func getMenuItems() -> [MenuItem]
+
+    // Payment action handlers (post-checkout routing)
+    func addPaymentAction(_ code: String, _ handler: @escaping PaymentActionHandler)
 }
 
 /// Thin facade over the four registries + injected `api`/`events`. Port of
@@ -108,5 +111,9 @@ public final class DefaultPlatformSDK: PlatformSDK, @unchecked Sendable {
     
     public func getMenuItems() -> [MenuItem] {
         menuItems.all()
+    }
+
+    public func addPaymentAction(_ code: String, _ handler: @escaping PaymentActionHandler) {
+        components.addPaymentAction(code, handler)
     }
 }

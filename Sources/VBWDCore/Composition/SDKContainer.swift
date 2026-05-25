@@ -34,6 +34,16 @@ public final class SDKContainer {
         self.session = AuthSession(service: service)
         self.themeRegistry = ThemeRegistry()
         self.themeManager = ThemeManager(registry: themeRegistry)
+
+        // Auto sign-out on 401 (expired / invalid token). The web client does
+        // the same via its axios response interceptor → `clearToken()`.
+        let session = self.session
+        apiClient.on(.tokenExpired) { [weak session] in
+            Task { @MainActor in
+                guard let session, session.isAuthenticated else { return }
+                await session.signOut()
+            }
+        }
     }
 
     public func makeLoginViewModel() -> LoginViewModel {

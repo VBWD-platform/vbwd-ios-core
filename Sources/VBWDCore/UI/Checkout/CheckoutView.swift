@@ -1,9 +1,9 @@
 import SwiftUI
 
 /// Checkout screen: order summary, plugin-injected sections (`Checkout*`
-/// convention), payment method selection, and Pay button. Payment providers
-/// (Apple Pay, Stripe, etc.) are implemented as iOS plugins — core only
-/// renders the selection and submits the checkout request.
+/// convention), payment method selection, and Pay button. After submitting,
+/// the view transitions through phases: form → processingPayment (Stripe
+/// redirect) → confirmation (success page).
 struct CheckoutView: View {
     @ObservedObject var viewModel: CheckoutViewModel
     @Environment(\.appTheme) var theme
@@ -11,11 +11,22 @@ struct CheckoutView: View {
 
     var body: some View {
         Group {
-            if viewModel.isLoading {
-                ProgressView("Loading\u{2026}")
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-            } else {
-                content
+            switch viewModel.phase {
+            case .form:
+                if viewModel.isLoading {
+                    ProgressView("Loading\u{2026}")
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                } else {
+                    formContent
+                }
+            case let .processingPayment(url, _):
+                PaymentRedirectView(url: url) {
+                    viewModel.completePayment()
+                }
+            case let .confirmation(result):
+                CheckoutConfirmationView(result: result) {
+                    dismiss()
+                }
             }
         }
         .background(theme.background.ignoresSafeArea())
@@ -25,26 +36,24 @@ struct CheckoutView: View {
         #endif
         .toolbar {
             ToolbarItem(placement: .cancellationAction) {
-                Button("Cancel") { dismiss() }
+                if viewModel.phase == .form {
+                    Button("Cancel") { dismiss() }
+                }
             }
         }
         .task { await viewModel.loadPaymentMethods() }
-        .onChange(of: viewModel.checkoutResult != nil) { completed in
-            if completed { dismiss() }
-        }
     }
 
-    // MARK: - Content
+    // MARK: - Form Content
 
-    private var content: some View {
+    private var formContent: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
                 Text("Checkout").font(.largeTitle).bold()
                     .foregroundColor(theme.textPrimary)
 
                 orderSummaryCard
-                pluginSections
-                paymentMethodCard
+                paymentMethodsSection
                 errorBanner
                 payButton
             }
@@ -88,29 +97,21 @@ struct CheckoutView: View {
         }
     }
 
-    // MARK: - Plugin Sections
+    // MARK: - Payment Methods (unified: selector + plugin detail)
 
-    @ViewBuilder
-    private var pluginSections: some View {
-        let comps = viewModel.checkoutComponents
-        if !comps.isEmpty {
-            ForEach(comps, id: \.name) { entry in
-                entry.factory()
-            }
-        }
-    }
-
-    // MARK: - Payment Methods
-
-    private var paymentMethodCard: some View {
+    private var paymentMethodsSection: some View {
         card("Payment Method") {
             if viewModel.paymentMethods.isEmpty {
                 Text("No payment methods available")
                     .foregroundColor(theme.textSecondary)
             } else {
                 ForEach(viewModel.paymentMethods) { method in
+                    let isSelected = viewModel.selectedMethodId == method.code
+
                     Button {
-                        viewModel.selectedMethodId = method.code
+                        withAnimation(.easeInOut(duration: 0.2)) {
+                            viewModel.selectedMethodId = method.code
+                        }
                     } label: {
                         HStack(spacing: 12) {
                             Image(systemName: iconFor(method))
@@ -119,18 +120,26 @@ struct CheckoutView: View {
                             Text(method.name)
                                 .foregroundColor(theme.textPrimary)
                             Spacer()
-                            if viewModel.selectedMethodId == method.code {
-                                Image(systemName: "checkmark.circle.fill")
-                                    .foregroundColor(theme.accent)
-                            } else {
-                                Image(systemName: "circle")
-                                    .foregroundColor(theme.textSecondary)
-                            }
+                            Image(systemName: isSelected
+                                  ? "checkmark.circle.fill" : "circle")
+                                .foregroundColor(isSelected
+                                                 ? theme.accent : theme.textSecondary)
                         }
                         .padding(.vertical, 4)
                     }
                     .buttonStyle(.plain)
                     .accessibilityIdentifier("payment_method_\(method.code)")
+
+                    // Show plugin-provided detail when this method is selected
+                    if isSelected,
+                       let detail = viewModel.paymentMethodDetail(for: method.code) {
+                        detail()
+                            .transition(.opacity.combined(with: .move(edge: .top)))
+                    }
+
+                    if method.id != viewModel.paymentMethods.last?.id {
+                        Divider()
+                    }
                 }
             }
         }
@@ -197,6 +206,7 @@ struct CheckoutView: View {
         case let c where c.contains("apple"): return "apple.logo"
         case let c where c.contains("stripe"): return "creditcard.fill"
         case let c where c.contains("paypal"): return "dollarsign.circle.fill"
+        case let c where c.contains("invoice"): return "doc.text.fill"
         default: return "creditcard"
         }
     }
