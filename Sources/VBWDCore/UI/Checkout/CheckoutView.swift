@@ -8,12 +8,16 @@ import SwiftUI
 /// Sprint 06c: Now uses `CartItem` line items from the active `CheckoutSource`
 /// instead of `CheckoutItem` protocol array. The source is resolved via
 /// `viewModel.loadForContext()`.
-struct CheckoutView: View {
+public struct CheckoutView: View {
     @ObservedObject var viewModel: CheckoutViewModel
     @Environment(\.appTheme) var theme
     @Environment(\.dismiss) var dismiss
 
-    var body: some View {
+    public init(viewModel: CheckoutViewModel) {
+        self.viewModel = viewModel
+    }
+
+    public var body: some View {
         Group {
             switch viewModel.phase {
             case .form:

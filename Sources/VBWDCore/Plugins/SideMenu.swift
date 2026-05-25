@@ -27,6 +27,10 @@ public struct SideMenu: View {
         PermissionEvaluator().has("subscription.invoices.view", in: permissions)
     }
 
+    private var hasStorePluginItems: Bool {
+        !host.sdk.menuItems.items(inSection: "store").isEmpty
+    }
+
     // MARK: - Body
 
     public var body: some View {
@@ -68,26 +72,61 @@ public struct SideMenu: View {
                         }
                     )
 
-                    // Store section (permission-gated)
-                    if canViewTokens {
+                    // Plugin top-level items (e.g. "Subscription")
+                    ForEach(host.sdk.menuItems.items(inSection: "top")) { item in
+                        MenuItemButton(
+                            icon: item.icon,
+                            title: item.title,
+                            badge: item.badge,
+                            action: {
+                                if let routePath = item.routePath {
+                                    host.selectedRoute = routePath
+                                }
+                                item.action()
+                                onClose()
+                            }
+                        )
+                    }
+
+                    // Store section (shown when user has token perms OR plugins inject store items)
+                    if canViewTokens || hasStorePluginItems {
                         Divider().padding(.vertical, 8)
                         MenuSectionHeader(title: "Store")
-                        MenuItemButton(
-                            icon: "circle.dotted.circle",
-                            title: "Tokens",
-                            action: {
-                                host.selectedRoute = "/store/tokens"
-                                onClose()
-                            }
-                        )
-                        MenuItemButton(
-                            icon: "cart.fill",
-                            title: "Buy Tokens",
-                            action: {
-                                host.selectedRoute = "/store/buy-tokens"
-                                onClose()
-                            }
-                        )
+
+                        if canViewTokens {
+                            MenuItemButton(
+                                icon: "circle.dotted.circle",
+                                title: "Tokens",
+                                action: {
+                                    host.selectedRoute = "/store/tokens"
+                                    onClose()
+                                }
+                            )
+                            MenuItemButton(
+                                icon: "cart.fill",
+                                title: "Buy Tokens",
+                                action: {
+                                    host.selectedRoute = "/store/buy-tokens"
+                                    onClose()
+                                }
+                            )
+                        }
+
+                        // Plugin store-section items (e.g. "Tarif Plans", "Add-Ons")
+                        ForEach(host.sdk.menuItems.items(inSection: "store")) { item in
+                            MenuItemButton(
+                                icon: item.icon,
+                                title: item.title,
+                                badge: item.badge,
+                                action: {
+                                    if let routePath = item.routePath {
+                                        host.selectedRoute = routePath
+                                    }
+                                    item.action()
+                                    onClose()
+                                }
+                            )
+                        }
                     }
 
                     // Billing section (permission-gated)

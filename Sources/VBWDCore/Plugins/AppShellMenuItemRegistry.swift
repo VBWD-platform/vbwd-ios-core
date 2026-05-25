@@ -22,4 +22,14 @@ public final class MenuItemRegistry: @unchecked Sendable {
     public func get(_ id: String) -> MenuItem? {
         items[id]
     }
+
+    /// Items assigned to a named section (e.g. `"top"`, `"store"`), sorted by order.
+    public func items(inSection section: String) -> [MenuItem] {
+        items.values.filter { $0.section == section }.sorted { $0.order < $1.order }
+    }
+
+    /// Items without a section assignment (rendered in the generic Plugin Items area).
+    public func unsectionedItems() -> [MenuItem] {
+        items.values.filter { $0.section == nil }.sorted { $0.order < $1.order }
+    }
 }

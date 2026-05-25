@@ -11,7 +11,7 @@ public struct PluginMenuItems: View {
     }
     
     public var body: some View {
-        let items = host.sdk.getMenuItems()
+        let items = host.sdk.menuItems.unsectionedItems()
         
         ForEach(items) { item in
             MenuItemButton(

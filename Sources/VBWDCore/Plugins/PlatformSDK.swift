@@ -7,12 +7,12 @@ public struct PluginRoute {
     public let name: String
     public let requiresAuth: Bool
     public let requiredUserPermission: String?
-    public let view: () -> AnyView
+    public let view: @MainActor () -> AnyView
 
     public init(path: String, name: String,
                 requiresAuth: Bool = false,
                 requiredUserPermission: String? = nil,
-                view: @escaping () -> AnyView) {
+                view: @MainActor @escaping () -> AnyView) {
         self.path = path
         self.name = name
         self.requiresAuth = requiresAuth

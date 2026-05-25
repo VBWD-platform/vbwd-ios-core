@@ -11,7 +11,11 @@ public struct MenuItem: Sendable, Identifiable {
     public let routePath: String?
     public let requiredPermission: String?
     public let order: Int
-    
+    /// Optional section grouping. Items with `section: "top"` render between
+    /// Settings and the Store divider; `"store"` renders inside the Store
+    /// section; `nil` (default) renders in the Plugin Items area at the bottom.
+    public let section: String?
+
     public init(
         id: String,
         icon: String,
@@ -20,7 +24,8 @@ public struct MenuItem: Sendable, Identifiable {
         action: @escaping @Sendable () -> Void = {},
         routePath: String? = nil,
         requiredPermission: String? = nil,
-        order: Int = 100
+        order: Int = 100,
+        section: String? = nil
     ) {
         self.id = id
         self.icon = icon
@@ -30,5 +35,6 @@ public struct MenuItem: Sendable, Identifiable {
         self.routePath = routePath
         self.requiredPermission = requiredPermission
         self.order = order
+        self.section = section
     }
 }
