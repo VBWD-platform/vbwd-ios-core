@@ -100,7 +100,7 @@ public final class CheckoutViewModel: ObservableObject {
                 try await source.load(context)
                 lineItems = source.lineItems()
             } catch {
-                errorMessage = error.localizedDescription
+                errorMessage = (error as? APIError)?.message ?? error.localizedDescription
             }
         } else {
             // Fallback: read cart items directly
@@ -180,6 +180,23 @@ public final class CheckoutViewModel: ObservableObject {
         } else if let result = checkoutResult {
             phase = .confirmation(result)
             events?.emit(AppEvents.checkoutCompleted)
+        }
+    }
+
+    /// Called when `ASWebAuthenticationSession` returns a callback URL from the
+    /// payment provider (e.g. `vbwd://stripe-callback/success?session_id=cs_...`).
+    /// Extracts the `session_id` query parameter and polls payment status.
+    public func completePayment(callbackURL: URL?) {
+        if let callbackURL,
+           let components = URLComponents(url: callbackURL, resolvingAgainstBaseURL: false),
+           let sessionId = components.queryItems?.first(where: { $0.name == "session_id" })?.value,
+           !sessionId.isEmpty {
+            Task {
+                await pollPaymentStatus(sessionId: sessionId)
+            }
+        } else {
+            // No callback URL (user cancelled) or no session_id — fall back
+            completePayment()
         }
     }
 

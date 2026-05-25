@@ -18,6 +18,11 @@ public struct APIClientConfig: Equatable, Sendable {
         self.timeout = timeout
         // Default first, caller-supplied headers override (web spread order).
         var merged = ["Content-Type": "application/json"]
+        #if os(iOS)
+        merged["X-Client-Platform"] = "ios"
+        #elseif os(macOS)
+        merged["X-Client-Platform"] = "macos"
+        #endif
         for (k, v) in headers { merged[k] = v }
         self.headers = merged
     }

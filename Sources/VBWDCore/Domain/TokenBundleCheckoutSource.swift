@@ -51,9 +51,12 @@ public final class TokenBundleCheckoutSource: CheckoutSource {
     public func submit(paymentMethodCode: String?) async throws -> CheckoutResult {
         let bundleIds = loadedItems.map(\.id)
         let currency = loadedItems.first?.currency ?? "USD"
+        // Include add-ons from cart so mixed-cart checkout works
+        let addOnIds = cart.items(ofType: "add_on").map(\.id)
 
         let request = TokenBundleCheckoutRequest(
             tokenBundleIds: bundleIds,
+            addOnIds: addOnIds,
             currency: currency,
             paymentMethodCode: paymentMethodCode ?? ""
         )
@@ -74,11 +77,13 @@ public final class TokenBundleCheckoutSource: CheckoutSource {
 /// (subscription, shop) build their own request bodies.
 struct TokenBundleCheckoutRequest: Encodable, Sendable {
     let tokenBundleIds: [String]
+    let addOnIds: [String]
     let currency: String
     let paymentMethodCode: String
 
     enum CodingKeys: String, CodingKey {
         case tokenBundleIds = "token_bundle_ids"
+        case addOnIds = "add_on_ids"
         case currency
         case paymentMethodCode = "payment_method_code"
     }

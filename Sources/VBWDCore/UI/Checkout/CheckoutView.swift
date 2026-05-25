@@ -28,8 +28,8 @@ public struct CheckoutView: View {
                     formContent
                 }
             case let .processingPayment(url, _):
-                PaymentRedirectView(url: url) {
-                    viewModel.completePayment()
+                PaymentRedirectView(url: url) { callbackURL in
+                    viewModel.completePayment(callbackURL: callbackURL)
                 }
             case let .confirmation(result):
                 CheckoutConfirmationView(result: result) {

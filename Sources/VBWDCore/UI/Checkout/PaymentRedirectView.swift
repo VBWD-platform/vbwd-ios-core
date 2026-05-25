@@ -1,19 +1,33 @@
 import SwiftUI
 
-#if canImport(SafariServices)
-import SafariServices
+#if canImport(AuthenticationServices)
+import AuthenticationServices
 #endif
 
 /// Displays a "Redirecting to payment…" message and opens the payment
-/// provider's URL in `SFSafariViewController` (iOS) or the default browser
-/// (macOS). When the user returns (dismiss / completion), calls `onComplete`.
-/// Mirrors the web `StripePaymentView.vue` redirect flow.
+/// provider's URL in `ASWebAuthenticationSession` (iOS) or the default browser
+/// (macOS). On iOS the session auto-dismisses when the page redirects to the
+/// `vbwd://` custom URL scheme, returning the callback URL (which contains the
+/// Stripe `session_id`). Replaces the previous `SFSafariViewController`
+/// approach which suffered from redirect loops and required manual dismissal.
 struct PaymentRedirectView: View {
     let url: URL
-    let onComplete: () -> Void
+    let callbackScheme: String
+    let onComplete: (URL?) -> Void
 
     @Environment(\.appTheme) var theme
-    @State private var showingSafari = false
+    #if os(iOS)
+    // Retains the auth session so it isn't deallocated before completion.
+    @StateObject private var sessionHolder = WebAuthSessionHolder()
+    #endif
+
+    init(url: URL,
+         callbackScheme: String = "vbwd",
+         onComplete: @escaping (URL?) -> Void) {
+        self.url = url
+        self.callbackScheme = callbackScheme
+        self.onComplete = onComplete
+    }
 
     var body: some View {
         VStack(spacing: 20) {
@@ -38,45 +52,76 @@ struct PaymentRedirectView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .accessibilityIdentifier("payment_redirect_view")
         .onAppear { openPaymentURL() }
-        #if os(iOS)
-        .sheet(isPresented: $showingSafari) {
-            onComplete()
-        } content: {
-            SafariView(url: url)
-                .ignoresSafeArea()
-        }
-        #endif
     }
 
     private func openPaymentURL() {
         #if os(iOS)
-        showingSafari = true
+        startWebAuthSession()
         #else
         // macOS — open in default browser and proceed immediately
         NSWorkspace.shared.open(url)
-        // Give user a moment to see the browser opened, then move to confirmation
         DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
-            onComplete()
+            onComplete(nil)
         }
         #endif
     }
+
+    #if os(iOS)
+    private func startWebAuthSession() {
+        let session = ASWebAuthenticationSession(
+            url: url,
+            callbackURLScheme: callbackScheme
+        ) { [onComplete] callbackURL, error in
+            DispatchQueue.main.async {
+                if let callbackURL {
+                    // Stripe redirected to vbwd://stripe-callback/success?session_id=cs_...
+                    onComplete(callbackURL)
+                } else {
+                    // User cancelled or error
+                    onComplete(nil)
+                }
+            }
+        }
+        session.prefersEphemeralWebBrowserSession = false
+        session.presentationContextProvider = WebAuthPresentationContext.shared
+        // Keep a strong reference so the session isn't deallocated.
+        sessionHolder.session = session
+        session.start()
+    }
+    #endif
 }
 
-// MARK: - Safari View (iOS)
+// MARK: - Session Holder (iOS)
 
 #if os(iOS)
-/// UIKit wrapper for `SFSafariViewController`.
-private struct SafariView: UIViewControllerRepresentable {
-    let url: URL
+/// Retains the `ASWebAuthenticationSession` for the lifetime of the view.
+@MainActor
+private final class WebAuthSessionHolder: ObservableObject {
+    var session: ASWebAuthenticationSession?
+}
+#endif
 
-    func makeUIViewController(context: Context) -> SFSafariViewController {
-        let config = SFSafariViewController.Configuration()
-        config.entersReaderIfAvailable = false
-        let vc = SFSafariViewController(url: url, configuration: config)
-        vc.preferredControlTintColor = .systemBlue
-        return vc
+// MARK: - Presentation Context (iOS)
+
+#if os(iOS)
+/// Provides the presentation anchor (key window) for ASWebAuthenticationSession.
+private final class WebAuthPresentationContext: NSObject,
+    ASWebAuthenticationPresentationContextProviding, @unchecked Sendable {
+
+    @MainActor static let shared = WebAuthPresentationContext()
+
+    func presentationAnchor(for session: ASWebAuthenticationSession) -> ASPresentationAnchor {
+        MainActor.assumeIsolated {
+            let scene = UIApplication.shared.connectedScenes
+                .compactMap { $0 as? UIWindowScene }
+                .first { $0.activationState == .foregroundActive }
+            return scene?.windows.first { $0.isKeyWindow }
+                ?? UIApplication.shared.connectedScenes
+                    .compactMap { $0 as? UIWindowScene }
+                    .flatMap { $0.windows }
+                    .first
+                ?? ASPresentationAnchor()
+        }
     }
-
-    func updateUIViewController(_ vc: SFSafariViewController, context: Context) {}
 }
 #endif
