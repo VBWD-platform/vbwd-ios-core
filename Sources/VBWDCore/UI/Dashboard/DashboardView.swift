@@ -7,6 +7,7 @@ import SwiftUI
 public struct DashboardView: View {
     @ObservedObject private var viewModel: DashboardViewModel
     @EnvironmentObject var host: PluginHost
+    @EnvironmentObject var cart: Cart
     @Environment(\.isMenuOpen) var isMenuOpen
     @Environment(\.appTheme) var theme
 
@@ -63,6 +64,14 @@ public struct DashboardView: View {
         }) {
             Image(systemName: "line.3.horizontal")
                 .font(.title3)
+                .overlay(alignment: .topTrailing) {
+                    if !cart.isEmpty {
+                        Circle()
+                            .fill(Color.red)
+                            .frame(width: 8, height: 8)
+                            .offset(x: 4, y: -4)
+                    }
+                }
         }
         .accessibilityIdentifier("menu_button")
     }

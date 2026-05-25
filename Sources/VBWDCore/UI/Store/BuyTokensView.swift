@@ -10,6 +10,7 @@ struct BuyTokensView: View {
     let checkoutViewModelFactory: (CheckoutContext) -> CheckoutViewModel
 
     @State private var showCheckout = false
+    @State private var addedBundleName: String?
 
     var body: some View {
         Group {
@@ -43,6 +44,23 @@ struct BuyTokensView: View {
                 Text("Buy Tokens").font(.largeTitle).bold()
                     .foregroundColor(theme.textPrimary)
 
+                if let name = addedBundleName {
+                    Text("\(name) is added to the cart")
+                        .foregroundColor(theme.success)
+                        .font(.callout)
+                        .padding()
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .background(RoundedRectangle(cornerRadius: 8)
+                            .fill(theme.success.opacity(0.1)))
+                        .transition(.opacity)
+                        .onAppear {
+                            Task {
+                                try? await Task.sleep(nanoseconds: 3_000_000_000)
+                                withAnimation { addedBundleName = nil }
+                            }
+                        }
+                }
+
                 if viewModel.bundles.isEmpty {
                     emptyCard
                 } else {
@@ -64,12 +82,18 @@ struct BuyTokensView: View {
     // MARK: - Actions
 
     private func selectBundle(_ bundle: TokenBundle) {
+        let wasEmpty = cart.isEmpty
         // Clear previous token_bundle items and add the selected one
         for item in cart.items(ofType: "token_bundle") {
             cart.remove(id: item.id)
         }
         cart.add(bundle.toCartItem())
-        showCheckout = true
+        // Only open checkout automatically if the cart was empty before adding
+        if wasEmpty {
+            showCheckout = true
+        } else {
+            withAnimation { addedBundleName = bundle.name }
+        }
     }
 
     // MARK: - Empty

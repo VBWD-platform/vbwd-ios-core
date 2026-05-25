@@ -7,6 +7,7 @@ public struct SideMenu: View {
     @EnvironmentObject var session: AuthSession
     @EnvironmentObject var host: PluginHost
     @Environment(\.isMenuOpen) var isMenuOpen
+    @Environment(\.showCartCheckout) var showCartCheckout
     @Environment(\.appTheme) var theme
 
     public init(onClose: @escaping () -> Void) {
@@ -36,7 +37,10 @@ public struct SideMenu: View {
     public var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             // Header
-            MenuHeader(user: session.currentUser)
+            MenuHeader(user: session.currentUser, onCartTap: {
+                onClose()
+                showCartCheckout.wrappedValue = true
+            })
                 .padding()
                 .accessibilityIdentifier("menu_header")
 

@@ -16,15 +16,19 @@ public struct BurgerMenuContainer<Content: View>: View {
             content
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .overlay(
-                    // Dim overlay when menu open
-                    Color.black.opacity(isMenuOpen ? 0.3 : 0)
-                        .ignoresSafeArea()
-                        .onTapGesture {
-                            withAnimation(.easeInOut(duration: 0.3)) {
-                                isMenuOpen = false
-                            }
+                    // Dim overlay when menu open — only present in hierarchy
+                    // when menu is open, so it doesn't block XCTest hittability.
+                    Group {
+                        if isMenuOpen {
+                            Color.black.opacity(0.3)
+                                .ignoresSafeArea()
+                                .onTapGesture {
+                                    withAnimation(.easeInOut(duration: 0.3)) {
+                                        isMenuOpen = false
+                                    }
+                                }
                         }
-                        .allowsHitTesting(isMenuOpen)
+                    }
                 )
             
             // Side menu
@@ -47,9 +51,19 @@ private struct MenuOpenKey: EnvironmentKey {
     static let defaultValue: Binding<Bool> = .constant(false)
 }
 
+// Environment key for cart checkout sheet
+private struct ShowCartCheckoutKey: EnvironmentKey {
+    static let defaultValue: Binding<Bool> = .constant(false)
+}
+
 extension EnvironmentValues {
     var isMenuOpen: Binding<Bool> {
         get { self[MenuOpenKey.self] }
         set { self[MenuOpenKey.self] = newValue }
+    }
+
+    public var showCartCheckout: Binding<Bool> {
+        get { self[ShowCartCheckoutKey.self] }
+        set { self[ShowCartCheckoutKey.self] = newValue }
     }
 }

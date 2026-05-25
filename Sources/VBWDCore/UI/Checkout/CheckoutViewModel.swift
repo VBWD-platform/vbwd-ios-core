@@ -62,8 +62,12 @@ public final class CheckoutViewModel: ObservableObject {
     }
 
     /// Order total from the active source, or summed from lineItems.
+    /// When showing full cart (no specific source), use lineItems sum.
     public var orderTotal: Double {
-        activeSource?.orderTotal() ?? lineItems.reduce(0) { $0 + $1.price * Double($1.quantity) }
+        if context.isCart && context.source == nil {
+            return lineItems.reduce(0) { $0 + $1.price * Double($1.quantity) }
+        }
+        return activeSource?.orderTotal() ?? lineItems.reduce(0) { $0 + $1.price * Double($1.quantity) }
     }
 
     /// Currency from the first line item.
@@ -87,7 +91,11 @@ public final class CheckoutViewModel: ObservableObject {
         let source = checkoutSources.find(context)
         activeSource = source
 
-        if let source {
+        // When opened from the cart button (isCart + no specific source),
+        // show ALL cart items instead of only one source's items.
+        if context.isCart && context.source == nil {
+            lineItems = cart.items
+        } else if let source {
             do {
                 try await source.load(context)
                 lineItems = source.lineItems()

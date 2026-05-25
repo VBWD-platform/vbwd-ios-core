@@ -11,6 +11,7 @@ public struct AppRoot: View {
     @ObservedObject private var themeManager: ThemeManager
     private let container: SDKContainer
     @State private var booted = false
+    @State private var showCartCheckout = false
 
     public init(container: SDKContainer,
                 plugins: [Plugin],
@@ -46,6 +47,16 @@ public struct AppRoot: View {
         .environmentObject(session)
         .environmentObject(host)
         .environmentObject(themeManager)
+        .environmentObject(container.cart)
+        .environment(\.showCartCheckout, $showCartCheckout)
+        .sheet(isPresented: $showCartCheckout) {
+            NavigationView {
+                CheckoutView(viewModel: container.makeCheckoutViewModel(
+                    context: CheckoutContext(isCart: true),
+                    components: host.components,
+                    events: host.sdk.events))
+            }
+        }
         .task {
             if !booted {
                 booted = true
