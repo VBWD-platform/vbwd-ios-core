@@ -6,10 +6,9 @@ import SwiftUI
 struct BuyTokensView: View {
     @ObservedObject var viewModel: BuyTokensViewModel
     @Environment(\.appTheme) var theme
+    @Environment(\.showCartCheckout) var showCartCheckout
     let cart: Cart
-    let checkoutViewModelFactory: (CheckoutContext) -> CheckoutViewModel
 
-    @State private var showCheckout = false
     @State private var addedBundleName: String?
 
     var body: some View {
@@ -28,12 +27,6 @@ struct BuyTokensView: View {
         #endif
         .modifier(MenuToolbar())
         .task { await viewModel.load() }
-        .sheet(isPresented: $showCheckout) {
-            NavigationView {
-                CheckoutView(viewModel: checkoutViewModelFactory(
-                    CheckoutContext(source: "token_bundle", isCart: true)))
-            }
-        }
     }
 
     // MARK: - Content
@@ -71,6 +64,7 @@ struct BuyTokensView: View {
                             bundleCard(bundle)
                         }
                         .buttonStyle(.plain)
+                        .contentShape(Rectangle())
                         .accessibilityIdentifier("bundle_\(bundle.id)")
                     }
                 }
@@ -90,7 +84,7 @@ struct BuyTokensView: View {
         cart.add(bundle.toCartItem())
         // Only open checkout automatically if the cart was empty before adding
         if wasEmpty {
-            showCheckout = true
+            showCartCheckout.wrappedValue = true
         } else {
             withAnimation { addedBundleName = bundle.name }
         }

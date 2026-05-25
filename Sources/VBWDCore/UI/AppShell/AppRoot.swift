@@ -82,13 +82,7 @@ public struct AppRoot: View {
         case "/store/buy-tokens":
             BuyTokensView(
                 viewModel: container.makeBuyTokensViewModel(),
-                cart: container.cart,
-                checkoutViewModelFactory: { context in
-                    container.makeCheckoutViewModel(
-                        context: context,
-                        components: host.components,
-                        events: host.sdk.events)
-                }
+                cart: container.cart
             )
         case "/billing/invoices":
             InvoicesView(viewModel: container.makeInvoicesViewModel())
