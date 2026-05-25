@@ -29,5 +29,6 @@ struct MenuToolbar: ViewModifier {
             Image(systemName: "line.3.horizontal")
                 .font(.title3)
         }
+        .accessibilityIdentifier("menu_button")
     }
 }

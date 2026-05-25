@@ -68,35 +68,18 @@ extension TokenBundle: CheckoutItem {
     public var checkoutItemQuantity: Int { 1 }
 }
 
-// MARK: - Checkout Request / Result
-
-/// Payload sent to `POST /user/checkout`. Mirrors the web
-/// `CheckoutRequestedEvent` fields (plan, bundles, add-ons, payment method).
-public struct CheckoutRequest: Encodable, Sendable {
-    public let tokenBundleIds: [String]?
-    public let currency: String
-    public let paymentMethodCode: String
-
-    public init(tokenBundleIds: [String]? = nil,
-                currency: String = "USD",
-                paymentMethodCode: String) {
-        self.tokenBundleIds = tokenBundleIds
-        self.currency = currency
-        self.paymentMethodCode = paymentMethodCode
-    }
-
-    enum CodingKeys: String, CodingKey {
-        case currency
-        case tokenBundleIds = "token_bundle_ids"
-        case paymentMethodCode = "payment_method_code"
-    }
-}
+// MARK: - Checkout Result
 
 /// Response from `POST /user/checkout`. The backend returns a nested
 /// `invoice` object; we expose convenience accessors at the top level.
 public struct CheckoutResult: Codable, Equatable, Sendable {
     public let invoice: CheckoutInvoice?
     public let message: String?
+
+    public init(invoice: CheckoutInvoice?, message: String?) {
+        self.invoice = invoice
+        self.message = message
+    }
 
     /// Convenience — the invoice ID needed for Stripe session creation and
     /// confirmation page navigation.
@@ -114,6 +97,24 @@ public struct CheckoutInvoice: Codable, Equatable, Sendable {
     public let status: String?
     public let paymentMethod: String?
     public let lineItems: [CheckoutLineItem]?
+
+    public init(id: String,
+                invoiceNumber: String? = nil,
+                amount: String? = nil,
+                totalAmount: String? = nil,
+                currency: String? = nil,
+                status: String? = nil,
+                paymentMethod: String? = nil,
+                lineItems: [CheckoutLineItem]? = nil) {
+        self.id = id
+        self.invoiceNumber = invoiceNumber
+        self.amount = amount
+        self.totalAmount = totalAmount
+        self.currency = currency
+        self.status = status
+        self.paymentMethod = paymentMethod
+        self.lineItems = lineItems
+    }
 
     enum CodingKeys: String, CodingKey {
         case id, amount, currency, status

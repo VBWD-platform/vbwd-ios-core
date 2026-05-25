@@ -91,27 +91,26 @@ func registerCheckoutSuites(_ runner: TestRunner) {
             return (404, Data())
         }
 
-        struct StubItem: CheckoutItem {
-            let checkoutItemId: String
-            let checkoutItemName: String
-            let checkoutItemPrice: String
-            let checkoutItemCurrency: String
-            let checkoutItemQuantity: Int
+        /// Helper: builds a CheckoutViewModel wired to a Cart with two token
+        /// bundles (Starter $9.99 + Pro $39.99) and a TokenBundleCheckoutSource.
+        @MainActor func makeVM(spy: SpyAPIClient,
+                               components: ComponentRegistry? = nil) -> CheckoutViewModel {
+            let cart = Cart()
+            cart.add(CartItem(type: "token_bundle", id: "b1", name: "Starter",
+                              price: 9.99, currency: "USD"))
+            cart.add(CartItem(type: "token_bundle", id: "b2", name: "Pro",
+                              price: 39.99, currency: "USD"))
+            let registry = CheckoutSourceRegistry()
+            registry.register(TokenBundleCheckoutSource(api: spy, cart: cart))
+            return CheckoutViewModel(
+                api: spy, context: CheckoutContext(),
+                cart: cart, checkoutSources: registry, components: components)
         }
-
-        let testItems: [any CheckoutItem] = [
-            StubItem(checkoutItemId: "b1", checkoutItemName: "Starter",
-                     checkoutItemPrice: "9.99", checkoutItemCurrency: "USD",
-                     checkoutItemQuantity: 1),
-            StubItem(checkoutItemId: "b2", checkoutItemName: "Pro",
-                     checkoutItemPrice: "39.99", checkoutItemCurrency: "USD",
-                     checkoutItemQuantity: 1),
-        ]
 
         await s.test("loadPaymentMethods_fetchesFromAPI") { @MainActor in
             let spy = SpyAPIClient(router: paymentMethodsRouter)
-            let vm = CheckoutViewModel(api: spy, items: testItems)
-            await vm.loadPaymentMethods()
+            let vm = makeVM(spy: spy)
+            await vm.loadForContext()
             s.expectEqual(vm.paymentMethods.count, 2)
             s.expectEqual(vm.paymentMethods.first?.code, "stripe")
             s.expect(!vm.isLoading)
@@ -119,7 +118,8 @@ func registerCheckoutSuites(_ runner: TestRunner) {
 
         await s.test("loadPaymentMethods_failure_toleratedWithEmptyList") { @MainActor in
             let router: SpyAPIClient.Router = { _, _, _ in (500, Data()) }
-            let vm = CheckoutViewModel(api: SpyAPIClient(router: router), items: testItems)
+            let spy = SpyAPIClient(router: router)
+            let vm = makeVM(spy: spy)
             await vm.loadPaymentMethods()
             s.expect(vm.paymentMethods.isEmpty)
             s.expect(!vm.isLoading)
@@ -127,7 +127,8 @@ func registerCheckoutSuites(_ runner: TestRunner) {
 
         await s.test("orderTotal_computedFromItems") { @MainActor in
             let spy = SpyAPIClient(router: paymentMethodsRouter)
-            let vm = CheckoutViewModel(api: spy, items: testItems)
+            let vm = makeVM(spy: spy)
+            await vm.loadForContext()
             // 9.99 + 39.99 = 49.98
             let total = vm.orderTotal
             s.expect(abs(total - 49.98) < 0.01, "expected ~49.98, got \(total)")
@@ -135,26 +136,30 @@ func registerCheckoutSuites(_ runner: TestRunner) {
 
         await s.test("currency_fromFirstItem") { @MainActor in
             let spy = SpyAPIClient(router: paymentMethodsRouter)
-            let vm = CheckoutViewModel(api: spy, items: testItems)
+            let vm = makeVM(spy: spy)
+            await vm.loadForContext()
             s.expectEqual(vm.currency, "USD")
         }
 
         await s.test("canSubmit_falseWhenNoMethodSelected") { @MainActor in
             let spy = SpyAPIClient(router: paymentMethodsRouter)
-            let vm = CheckoutViewModel(api: spy, items: testItems)
+            let vm = makeVM(spy: spy)
+            await vm.loadForContext()
             s.expect(!vm.canSubmit)
         }
 
         await s.test("canSubmit_trueWhenMethodSelected") { @MainActor in
             let spy = SpyAPIClient(router: paymentMethodsRouter)
-            let vm = CheckoutViewModel(api: spy, items: testItems)
+            let vm = makeVM(spy: spy)
+            await vm.loadForContext()
             vm.selectedMethodId = "stripe"
             s.expect(vm.canSubmit)
         }
 
         await s.test("submit_postsCheckoutRequest") { @MainActor in
             let spy = SpyAPIClient(router: paymentMethodsRouter)
-            let vm = CheckoutViewModel(api: spy, items: testItems)
+            let vm = makeVM(spy: spy)
+            await vm.loadForContext()
             vm.selectedMethodId = "stripe"
             await vm.submit()
             s.expectNotNil(vm.checkoutResult)
@@ -162,7 +167,7 @@ func registerCheckoutSuites(_ runner: TestRunner) {
             s.expectEqual(vm.checkoutResult?.status, "pending")
             s.expectNil(vm.errorMessage)
             s.expect(!vm.isSubmitting)
-            // Verify POST was made
+            // Verify POST was made to /user/checkout
             let postCalls = spy.calls.filter { $0.method == .post && $0.path == "/user/checkout" }
             s.expectEqual(postCalls.count, 1)
         }
@@ -174,7 +179,9 @@ func registerCheckoutSuites(_ runner: TestRunner) {
                 }
                 return paymentMethodsRouter(path, method, body)
             }
-            let vm = CheckoutViewModel(api: SpyAPIClient(router: router), items: testItems)
+            let spy = SpyAPIClient(router: router)
+            let vm = makeVM(spy: spy)
+            await vm.loadForContext()
             vm.selectedMethodId = "stripe"
             await vm.submit()
             s.expectNil(vm.checkoutResult)
@@ -184,7 +191,8 @@ func registerCheckoutSuites(_ runner: TestRunner) {
 
         await s.test("submit_withoutSelectedMethod_doesNothing") { @MainActor in
             let spy = SpyAPIClient(router: paymentMethodsRouter)
-            let vm = CheckoutViewModel(api: spy, items: testItems)
+            let vm = makeVM(spy: spy)
+            await vm.loadForContext()
             // selectedMethodId is nil
             await vm.submit()
             s.expectNil(vm.checkoutResult)
@@ -194,7 +202,8 @@ func registerCheckoutSuites(_ runner: TestRunner) {
 
         await s.test("isSubmitting_falseAfterSubmit") { @MainActor in
             let spy = SpyAPIClient(router: paymentMethodsRouter)
-            let vm = CheckoutViewModel(api: spy, items: testItems)
+            let vm = makeVM(spy: spy)
+            await vm.loadForContext()
             s.expect(!vm.isSubmitting)
             vm.selectedMethodId = "stripe"
             await vm.submit()
@@ -293,12 +302,17 @@ func registerCheckoutSuites(_ runner: TestRunner) {
             return (404, Data())
         }
 
-        struct StubItem: CheckoutItem {
-            let checkoutItemId = "b1"
-            let checkoutItemName = "Test"
-            let checkoutItemPrice = "9.99"
-            let checkoutItemCurrency = "USD"
-            let checkoutItemQuantity = 1
+        /// Helper: builds a minimal CheckoutViewModel with one cart item.
+        @MainActor func makeFilterVM(spy: SpyAPIClient,
+                                     components: ComponentRegistry? = nil) -> CheckoutViewModel {
+            let cart = Cart()
+            cart.add(CartItem(type: "token_bundle", id: "b1", name: "Test",
+                              price: 9.99, currency: "USD"))
+            let registry = CheckoutSourceRegistry()
+            registry.register(TokenBundleCheckoutSource(api: spy, cart: cart))
+            return CheckoutViewModel(
+                api: spy, context: CheckoutContext(),
+                cart: cart, checkoutSources: registry, components: components)
         }
 
         await s.test("filtersToOnlyPluginSupportedMethods") { @MainActor in
@@ -306,7 +320,7 @@ func registerCheckoutSuites(_ runner: TestRunner) {
             let components = ComponentRegistry()
             components.add("PaymentMethodStripe") { AnyView(EmptyView()) }
             components.add("PaymentMethodInvoice") { AnyView(EmptyView()) }
-            let vm = CheckoutViewModel(api: spy, items: [StubItem()], components: components)
+            let vm = makeFilterVM(spy: spy, components: components)
             await vm.loadPaymentMethods()
             s.expectEqual(vm.paymentMethods.count, 2)
             let codes = Set(vm.paymentMethods.map(\.code))
@@ -317,14 +331,14 @@ func registerCheckoutSuites(_ runner: TestRunner) {
 
         await s.test("showsAllMethodsWhenNoPluginsRegistered") { @MainActor in
             let spy = SpyAPIClient(router: allMethodsRouter)
-            let vm = CheckoutViewModel(api: spy, items: [StubItem()])
+            let vm = makeFilterVM(spy: spy)
             await vm.loadPaymentMethods()
             s.expectEqual(vm.paymentMethods.count, 3)
         }
 
         await s.test("showsAllMethodsWhenComponentsNil") { @MainActor in
             let spy = SpyAPIClient(router: allMethodsRouter)
-            let vm = CheckoutViewModel(api: spy, items: [StubItem()], components: nil)
+            let vm = makeFilterVM(spy: spy, components: nil)
             await vm.loadPaymentMethods()
             s.expectEqual(vm.paymentMethods.count, 3)
         }

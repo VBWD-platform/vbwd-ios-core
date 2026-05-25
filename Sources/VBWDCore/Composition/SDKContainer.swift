@@ -15,6 +15,8 @@ public final class SDKContainer {
     public let session: AuthSession
     public let themeRegistry: ThemeRegistry
     public let themeManager: ThemeManager
+    public let cart: Cart
+    public let checkoutSources: CheckoutSourceRegistry
 
     /// - Parameters:
     ///   - baseURL: API base; defaults to `vbwd_config.json` → `defaultBaseURL`.
@@ -34,6 +36,12 @@ public final class SDKContainer {
         self.session = AuthSession(service: service)
         self.themeRegistry = ThemeRegistry()
         self.themeManager = ThemeManager(registry: themeRegistry)
+        self.cart = Cart()
+        self.checkoutSources = CheckoutSourceRegistry()
+
+        // Register the built-in token bundle checkout source.
+        let bundleSource = TokenBundleCheckoutSource(api: apiClient, cart: cart)
+        checkoutSources.register(bundleSource)
 
         // Auto sign-out on 401 (expired / invalid token). The web client does
         // the same via its axios response interceptor → `clearToken()`.
@@ -72,9 +80,19 @@ public final class SDKContainer {
         InvoicesViewModel(api: apiClient)
     }
 
-    func makeCheckoutViewModel(items: [any CheckoutItem],
-                               components: ComponentRegistry? = nil) -> CheckoutViewModel {
-        CheckoutViewModel(api: apiClient, items: items, components: components)
+    func makeInvoiceDetailViewModel(invoiceId: String) -> InvoiceDetailViewModel {
+        InvoiceDetailViewModel(api: apiClient, invoiceId: invoiceId)
+    }
+
+    func makeCheckoutViewModel(context: CheckoutContext,
+                               components: ComponentRegistry? = nil,
+                               events: EventBus? = nil) -> CheckoutViewModel {
+        CheckoutViewModel(api: apiClient,
+                          context: context,
+                          cart: cart,
+                          checkoutSources: checkoutSources,
+                          components: components,
+                          events: events)
     }
 
     /// Builds the plugin composition root. `manifestLoader` defaults to the
@@ -86,6 +104,7 @@ public final class SDKContainer {
                                fallback: PluginManifest = .empty) -> PluginHost {
         let loader = manifestLoader ?? RemotePluginManifestLoader(
             api: apiClient, path: manifestPath, fallback: fallback)
-        return PluginHost(api: apiClient, manifestLoader: loader, plugins: plugins)
+        return PluginHost(api: apiClient, manifestLoader: loader, plugins: plugins,
+                          cart: cart, checkoutSources: checkoutSources)
     }
 }

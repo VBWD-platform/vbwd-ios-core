@@ -77,6 +77,16 @@ final class SpyAPIClient: APIClient, @unchecked Sendable {
     func delete<R: Decodable>(_ path: String) async throws -> R {
         try route(path, .delete, nil)
     }
+    func getData(_ path: String) async throws -> Data {
+        calls.append((path, .get, nil))
+        let (status, data) = router(path, .get, nil)
+        if status == 401 { handlers[.tokenExpired]?.forEach { $0() } }
+        guard (200..<300).contains(status) else {
+            throw APIError.fromResponse(status: status, body: data,
+                                        statusText: "HTTP \(status)")
+        }
+        return data
+    }
     func setToken(_ token: String?) { tokenHistory.append(token) }
     func on(_ event: APIEvent, _ handler: @escaping () -> Void) {
         handlers[event, default: []].append(handler)

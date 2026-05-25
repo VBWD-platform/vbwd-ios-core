@@ -8,10 +8,10 @@ public enum CheckoutPhase: Equatable {
     case confirmation(CheckoutResult)
 }
 
-/// Checkout screen logic. Fetches payment methods from the backend, renders an
-/// order summary of `CheckoutItem`s, and submits via `POST /user/checkout`.
-/// After the order is created, it asks the selected payment plugin what to do
-/// next (redirect to Stripe, or go straight to confirmation for invoice).
+/// Checkout orchestrator. Finds the matching `CheckoutSource` for the given
+/// context, delegates `load()`/`submit()` to it, and manages payment method
+/// selection + phase transitions. Mirrors the web `checkout.ts` store —
+/// core never names a domain, only delegates.
 @MainActor
 public final class CheckoutViewModel: ObservableObject {
     @Published public private(set) var isLoading = false
@@ -21,20 +21,32 @@ public final class CheckoutViewModel: ObservableObject {
     @Published public private(set) var checkoutResult: CheckoutResult?
     @Published public private(set) var phase: CheckoutPhase = .form
     @Published public private(set) var errorMessage: String?
+    @Published public private(set) var lineItems: [CartItem] = []
 
-    public let items: [any CheckoutItem]
+    public private(set) var activeSource: CheckoutSource?
+
     private let api: APIClient
+    private let context: CheckoutContext
+    private let cart: Cart
+    private let checkoutSources: CheckoutSourceRegistry
     private let endpoints: StoreEndpoints
     private let components: ComponentRegistry?
+    private let events: EventBus?
 
     public init(api: APIClient,
-                items: [any CheckoutItem],
+                context: CheckoutContext,
+                cart: Cart,
+                checkoutSources: CheckoutSourceRegistry,
                 endpoints: StoreEndpoints = StoreEndpoints(),
-                components: ComponentRegistry? = nil) {
+                components: ComponentRegistry? = nil,
+                events: EventBus? = nil) {
         self.api = api
-        self.items = items
+        self.context = context
+        self.cart = cart
+        self.checkoutSources = checkoutSources
         self.endpoints = endpoints
         self.components = components
+        self.events = events
     }
 
     // MARK: - Computed
@@ -44,68 +56,84 @@ public final class CheckoutViewModel: ObservableObject {
         components?.checkoutComponents() ?? []
     }
 
-    /// Returns the plugin-provided detail view for a payment method code,
-    /// or nil if the plugin didn't register one.
+    /// Returns the plugin-provided detail view for a payment method code.
     public func paymentMethodDetail(for code: String) -> ComponentFactory? {
         components?.paymentMethodDetail(for: code)
     }
 
-    /// Summed order total from all items.
+    /// Order total from the active source, or summed from lineItems.
     public var orderTotal: Double {
-        items.reduce(0) { sum, item in
-            sum + (Double(item.checkoutItemPrice) ?? 0) * Double(item.checkoutItemQuantity)
-        }
+        activeSource?.orderTotal() ?? lineItems.reduce(0) { $0 + $1.price * Double($1.quantity) }
     }
 
-    /// Currency from the first item (all items expected same currency).
+    /// Currency from the first line item.
     public var currency: String {
-        items.first?.checkoutItemCurrency ?? "USD"
+        lineItems.first?.currency ?? "USD"
     }
 
     public var canSubmit: Bool {
-        selectedMethodId != nil && !isSubmitting && !items.isEmpty
+        selectedMethodId != nil && !isSubmitting && !lineItems.isEmpty
     }
 
     // MARK: - Actions
 
-    public func loadPaymentMethods() async {
+    /// Find the matching checkout source, load its items, and fetch payment
+    /// methods. Called by CheckoutView in `.task`.
+    public func loadForContext() async {
         isLoading = true
+        events?.emit(AppEvents.checkoutStarted)
+
+        // Find the checkout source that handles this context
+        let source = checkoutSources.find(context)
+        activeSource = source
+
+        if let source {
+            do {
+                try await source.load(context)
+                lineItems = source.lineItems()
+            } catch {
+                errorMessage = error.localizedDescription
+            }
+        } else {
+            // Fallback: read cart items directly
+            lineItems = cart.items
+        }
+
+        // Load payment methods
+        await loadPaymentMethods()
+        isLoading = false
+    }
+
+    /// Fetches payment methods and filters by installed plugins.
+    public func loadPaymentMethods() async {
         let r: PaymentMethodsResponse? = try? await api.get(endpoints.paymentMethods)
         let all = r?.methods ?? []
-        // Only show methods that have a corresponding iOS plugin installed.
         let supported = components?.supportedPaymentMethodCodes()
         if let supported, !supported.isEmpty {
             paymentMethods = all.filter { supported.contains($0.code) }
         } else {
             paymentMethods = all
         }
-        isLoading = false
     }
 
-    /// Creates the order via `POST /user/checkout`, then delegates to the
-    /// plugin's payment action handler. Mirrors the web `PublicCheckoutView`
-    /// post-submit watcher that routes to `/pay/stripe` or `/checkout/confirmation`.
+    /// Delegates submit to the active checkout source, then routes to
+    /// the payment plugin's action handler. Mirrors the web `PublicCheckoutView`
+    /// post-submit watcher.
     public func submit() async {
         guard let methodCode = selectedMethodId else { return }
+        guard let source = activeSource else { return }
 
         isSubmitting = true
         errorMessage = nil
 
-        let bundleIds = items.map(\.checkoutItemId)
-        let request = CheckoutRequest(
-            tokenBundleIds: bundleIds,
-            currency: currency,
-            paymentMethodCode: methodCode
-        )
-
         do {
-            let result: CheckoutResult = try await api.post(
-                endpoints.checkout, body: request)
+            let result = try await source.submit(paymentMethodCode: methodCode)
             checkoutResult = result
 
             guard let invoiceId = result.invoiceId else {
                 phase = .confirmation(result)
                 isSubmitting = false
+                events?.emit(AppEvents.checkoutCompleted)
                 return
             }
 
@@ -115,24 +143,95 @@ public final class CheckoutViewModel: ObservableObject {
                 switch action {
                 case .showConfirmation:
                     phase = .confirmation(result)
+                    events?.emit(AppEvents.checkoutCompleted)
                 case let .openURL(url, sessionId):
                     phase = .processingPayment(url, sessionId: sessionId)
                 }
             } else {
-                // No handler registered → go straight to confirmation (invoice)
+                // No handler → straight to confirmation (invoice)
                 phase = .confirmation(result)
+                events?.emit(AppEvents.checkoutCompleted)
             }
         } catch {
             errorMessage = (error as? APIError)?.message ?? error.localizedDescription
+            events?.emit(AppEvents.checkoutFailed)
         }
 
         isSubmitting = false
     }
 
     /// Called when the user returns from an external payment page (e.g. Stripe).
+    /// Polls the payment status if a session ID is available, then transitions
+    /// to confirmation.
     public func completePayment() {
+        if case let .processingPayment(_, sessionId) = phase,
+           let sessionId, !sessionId.isEmpty {
+            Task {
+                await pollPaymentStatus(sessionId: sessionId)
+            }
+        } else if let result = checkoutResult {
+            phase = .confirmation(result)
+            events?.emit(AppEvents.checkoutCompleted)
+        }
+    }
+
+    // MARK: - Payment Status Polling
+
+    /// Poll the payment provider's status endpoint until we get a terminal
+    /// state. Matches the web `usePaymentStatus` (2s interval, max 10 attempts).
+    private func pollPaymentStatus(sessionId: String) async {
+        struct StatusResponse: Codable {
+            let status: String?
+            let invoiceId: String?
+            enum CodingKeys: String, CodingKey {
+                case status
+                case invoiceId = "invoice_id"
+            }
+        }
+
+        let maxAttempts = 10
+        let interval: UInt64 = 2_000_000_000
+
+        for _ in 0..<maxAttempts {
+            let resp: StatusResponse? = try? await api.get(
+                "/plugins/stripe/session-status/\(sessionId)")
+
+            if let status = resp?.status?.lowercased() {
+                if status == "paid" || status == "complete" {
+                    if var result = checkoutResult, let invoice = result.invoice {
+                        let updated = CheckoutInvoice(
+                            id: invoice.id,
+                            invoiceNumber: invoice.invoiceNumber,
+                            amount: invoice.amount,
+                            totalAmount: invoice.totalAmount,
+                            currency: invoice.currency,
+                            status: "paid",
+                            paymentMethod: invoice.paymentMethod,
+                            lineItems: invoice.lineItems)
+                        result = CheckoutResult(invoice: updated, message: result.message)
+                        phase = .confirmation(result)
+                    } else {
+                        phase = .confirmation(
+                            checkoutResult ?? CheckoutResult(invoice: nil, message: "Payment successful"))
+                    }
+                    events?.emit(AppEvents.paymentSucceeded)
+                    events?.emit(AppEvents.checkoutCompleted)
+                    return
+                } else if status == "failed" || status == "expired" {
+                    errorMessage = "Payment failed. Please try again."
+                    phase = .form
+                    events?.emit(AppEvents.paymentFailed)
+                    return
+                }
+            }
+
+            try? await Task.sleep(nanoseconds: interval)
+        }
+
+        // Timeout — show confirmation with current (pending) status
         if let result = checkoutResult {
             phase = .confirmation(result)
+            events?.emit(AppEvents.checkoutCompleted)
         }
     }
 }

@@ -6,6 +6,7 @@ import SwiftUI
 /// Sprint 05: uses theme colors.
 public struct DashboardView: View {
     @ObservedObject private var viewModel: DashboardViewModel
+    @EnvironmentObject var host: PluginHost
     @Environment(\.isMenuOpen) var isMenuOpen
     @Environment(\.appTheme) var theme
 
@@ -107,16 +108,22 @@ public struct DashboardView: View {
                 Text("No invoices").foregroundColor(theme.textSecondary)
             } else {
                 ForEach(viewModel.recentInvoices) { inv in
-                    HStack {
-                        Text(inv.invoiceNumber ?? inv.id)
-                            .foregroundColor(theme.textPrimary)
-                        Spacer()
-                        Text(inv.amount ?? "—")
-                            .foregroundColor(theme.textPrimary)
-                        Text(inv.status ?? "")
-                            .font(.caption)
-                            .foregroundColor(theme.textSecondary)
+                    Button {
+                        host.selectedRoute = "/billing/invoice/\(inv.id)"
+                    } label: {
+                        HStack {
+                            Text(inv.invoiceNumber ?? inv.id)
+                                .foregroundColor(theme.textPrimary)
+                            Spacer()
+                            Text(inv.amount ?? "—")
+                                .foregroundColor(theme.textPrimary)
+                            Text(inv.status ?? "")
+                                .font(.caption)
+                                .foregroundColor(theme.textSecondary)
+                        }
                     }
+                    .buttonStyle(.plain)
+                    .accessibilityIdentifier("dashboard_invoice_\(inv.id)")
                 }
             }
         }

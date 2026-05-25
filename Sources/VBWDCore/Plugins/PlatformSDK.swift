@@ -48,6 +48,12 @@ public protocol PlatformSDK: AnyObject, Sendable {
 
     // Payment action handlers (post-checkout routing)
     func addPaymentAction(_ code: String, _ handler: @escaping PaymentActionHandler)
+
+    // Sprint 06c — Cart + Checkout Source
+    var cart: Cart { get }
+    var checkoutSources: CheckoutSourceRegistry { get }
+    @MainActor func addCheckoutSource(_ source: CheckoutSource)
+    @MainActor func removeCheckoutSource(id: String)
 }
 
 /// Thin facade over the four registries + injected `api`/`events`. Port of
@@ -62,6 +68,8 @@ public final class DefaultPlatformSDK: PlatformSDK, @unchecked Sendable {
     public let stores: StoreRegistry
     public let localizations: LocalizationRegistry
     public let menuItems: MenuItemRegistry  // Sprint 03
+    public let cart: Cart                   // Sprint 06c
+    public let checkoutSources: CheckoutSourceRegistry  // Sprint 06c
 
     public init(api: APIClient,
                 events: EventBus,
@@ -69,7 +77,9 @@ public final class DefaultPlatformSDK: PlatformSDK, @unchecked Sendable {
                 components: ComponentRegistry = ComponentRegistry(),
                 stores: StoreRegistry = StoreRegistry(),
                 localizations: LocalizationRegistry = LocalizationRegistry(),
-                menuItems: MenuItemRegistry = MenuItemRegistry()) {
+                menuItems: MenuItemRegistry = MenuItemRegistry(),
+                cart: Cart,
+                checkoutSources: CheckoutSourceRegistry) {
         self.api = api
         self.events = events
         self.routes = routes
@@ -77,6 +87,8 @@ public final class DefaultPlatformSDK: PlatformSDK, @unchecked Sendable {
         self.stores = stores
         self.localizations = localizations
         self.menuItems = menuItems
+        self.cart = cart
+        self.checkoutSources = checkoutSources
     }
 
     public func addRoute(_ route: PluginRoute) throws { try routes.add(route) }
@@ -115,5 +127,13 @@ public final class DefaultPlatformSDK: PlatformSDK, @unchecked Sendable {
 
     public func addPaymentAction(_ code: String, _ handler: @escaping PaymentActionHandler) {
         components.addPaymentAction(code, handler)
+    }
+
+    @MainActor public func addCheckoutSource(_ source: CheckoutSource) {
+        checkoutSources.register(source)
+    }
+
+    @MainActor public func removeCheckoutSource(id: String) {
+        checkoutSources.unregister(id: id)
     }
 }

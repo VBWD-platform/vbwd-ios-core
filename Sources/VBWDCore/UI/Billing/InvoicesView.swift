@@ -5,10 +5,12 @@ import SwiftUI
 /// Sprint 06: Billing > Invoices menu item.
 struct InvoicesView: View {
     @ObservedObject var viewModel: InvoicesViewModel
+    @EnvironmentObject var host: PluginHost
     @Environment(\.appTheme) var theme
 
     var body: some View {
-        Group {
+        ZStack {
+            theme.background.ignoresSafeArea()
             if viewModel.isLoading {
                 ProgressView("Loading\u{2026}")
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -16,7 +18,6 @@ struct InvoicesView: View {
                 content
             }
         }
-        .background(theme.background.ignoresSafeArea())
         .accessibilityIdentifier("invoices_view")
         #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
@@ -37,7 +38,13 @@ struct InvoicesView: View {
                     emptyCard
                 } else {
                     ForEach(viewModel.invoices) { inv in
-                        invoiceRow(inv)
+                        Button {
+                            host.selectedRoute = "/billing/invoice/\(inv.id)"
+                        } label: {
+                            invoiceRow(inv)
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityIdentifier("invoice_row_\(inv.id)")
                     }
                 }
             }
@@ -101,7 +108,6 @@ struct InvoicesView: View {
         .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(RoundedRectangle(cornerRadius: 8).fill(theme.cardBackground))
-        .accessibilityIdentifier("invoice_row_\(inv.id)")
     }
 
     // MARK: - Status Badge

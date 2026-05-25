@@ -4,6 +4,10 @@ import SwiftUI
 /// convention), payment method selection, and Pay button. After submitting,
 /// the view transitions through phases: form → processingPayment (Stripe
 /// redirect) → confirmation (success page).
+///
+/// Sprint 06c: Now uses `CartItem` line items from the active `CheckoutSource`
+/// instead of `CheckoutItem` protocol array. The source is resolved via
+/// `viewModel.loadForContext()`.
 struct CheckoutView: View {
     @ObservedObject var viewModel: CheckoutViewModel
     @Environment(\.appTheme) var theme
@@ -41,7 +45,7 @@ struct CheckoutView: View {
                 }
             }
         }
-        .task { await viewModel.loadPaymentMethods() }
+        .task { await viewModel.loadForContext() }
     }
 
     // MARK: - Form Content
@@ -65,19 +69,19 @@ struct CheckoutView: View {
 
     private var orderSummaryCard: some View {
         card("Order Summary") {
-            ForEach(Array(viewModel.items.enumerated()), id: \.offset) { _, item in
+            ForEach(viewModel.lineItems) { item in
                 HStack {
                     VStack(alignment: .leading, spacing: 2) {
-                        Text(item.checkoutItemName)
+                        Text(item.name)
                             .foregroundColor(theme.textPrimary)
-                        if item.checkoutItemQuantity > 1 {
-                            Text("Qty: \(item.checkoutItemQuantity)")
+                        if item.quantity > 1 {
+                            Text("Qty: \(item.quantity)")
                                 .font(.caption)
                                 .foregroundColor(theme.textSecondary)
                         }
                     }
                     Spacer()
-                    Text("\(item.checkoutItemCurrency) \(item.checkoutItemPrice)")
+                    Text(String(format: "%@ %.2f", item.currency, item.price * Double(item.quantity)))
                         .fontWeight(.medium)
                         .foregroundColor(theme.textPrimary)
                 }

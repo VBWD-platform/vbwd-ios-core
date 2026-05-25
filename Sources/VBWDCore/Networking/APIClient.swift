@@ -22,6 +22,10 @@ public protocol APIClient: AnyObject, Sendable {
     func patch<R: Decodable>(_ path: String, body: (any Encodable)?) async throws -> R
     func delete<R: Decodable>(_ path: String) async throws -> R
 
+    /// Raw data download (e.g. PDF). Returns the response body without JSON
+    /// decoding. Not all implementations support this; the default throws.
+    func getData(_ path: String) async throws -> Data
+
     /// Set/clear the bearer token (web `setToken`/`clearToken`).
     func setToken(_ token: String?)
 
@@ -35,5 +39,8 @@ public extension APIClient {
     }
     func put<R: Decodable>(_ path: String) async throws -> R {
         try await put(path, body: nil)
+    }
+    func getData(_ path: String) async throws -> Data {
+        throw APIError.transport(message: "getData not supported")
     }
 }

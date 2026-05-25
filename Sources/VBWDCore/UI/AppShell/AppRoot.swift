@@ -71,13 +71,20 @@ public struct AppRoot: View {
         case "/store/buy-tokens":
             BuyTokensView(
                 viewModel: container.makeBuyTokensViewModel(),
-                checkoutViewModelFactory: { items in
+                cart: container.cart,
+                checkoutViewModelFactory: { context in
                     container.makeCheckoutViewModel(
-                        items: items, components: host.components)
+                        context: context,
+                        components: host.components,
+                        events: host.sdk.events)
                 }
             )
         case "/billing/invoices":
             InvoicesView(viewModel: container.makeInvoicesViewModel())
+        case let route? where route.hasPrefix("/billing/invoice/"):
+            InvoiceDetailView(
+                viewModel: container.makeInvoiceDetailViewModel(
+                    invoiceId: String(route.dropFirst("/billing/invoice/".count))))
         case let route?:
             if let pluginRoute = host.routes.first(where: { $0.path == route }) {
                 pluginRoute.view()

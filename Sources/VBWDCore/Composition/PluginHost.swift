@@ -19,8 +19,11 @@ public final class PluginHost: ObservableObject {
 
     public init(api: APIClient,
                 manifestLoader: PluginManifestLoader,
-                plugins: [Plugin]) {
-        self.sdk = DefaultPlatformSDK(api: api, events: DefaultEventBus(api: api))
+                plugins: [Plugin],
+                cart: Cart = Cart(),
+                checkoutSources: CheckoutSourceRegistry = CheckoutSourceRegistry()) {
+        self.sdk = DefaultPlatformSDK(api: api, events: DefaultEventBus(api: api),
+                                      cart: cart, checkoutSources: checkoutSources)
         self.manifestLoader = manifestLoader
         self.plugins = plugins
     }

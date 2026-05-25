@@ -46,6 +46,38 @@ public final class URLSessionAPIClient: APIClient, @unchecked Sendable {
         try await send(path, .delete, body: nil)
     }
 
+    public func getData(_ path: String) async throws -> Data {
+        var request = URLRequest(url: makeURL(path))
+        request.httpMethod = HTTPMethod.get.rawValue
+        request.timeoutInterval = config.timeout
+        if let token = tokenProvider.token {
+            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        }
+
+        let data: Data
+        let response: URLResponse
+        do {
+            (data, response) = try await session.data(for: request)
+        } catch {
+            throw APIError.fromTransport(error)
+        }
+
+        guard let http = response as? HTTPURLResponse else {
+            throw APIError.transport(message: "Non-HTTP response")
+        }
+
+        if http.statusCode == 401 { emit(.tokenExpired) }
+
+        guard (200..<300).contains(http.statusCode) else {
+            throw APIError.fromResponse(
+                status: http.statusCode,
+                body: data,
+                statusText: HTTPURLResponse.localizedString(forStatusCode: http.statusCode))
+        }
+
+        return data
+    }
+
     public func setToken(_ token: String?) { tokenProvider.token = token }
 
     public nonisolated func on(_ event: APIEvent, _ handler: @escaping @Sendable () -> Void) {

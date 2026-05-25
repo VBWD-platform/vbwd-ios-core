@@ -1,13 +1,15 @@
 import SwiftUI
 
 /// Token bundle storefront. Lists available bundles with name, token amount,
-/// and price. Tapping a bundle opens the checkout sheet. Sprint 06b.
+/// and price. Tapping a bundle adds it to the cart and opens the checkout
+/// sheet. Sprint 06c: uses the agnostic `Cart` instead of passing items directly.
 struct BuyTokensView: View {
     @ObservedObject var viewModel: BuyTokensViewModel
     @Environment(\.appTheme) var theme
-    let checkoutViewModelFactory: ([any CheckoutItem]) -> CheckoutViewModel
+    let cart: Cart
+    let checkoutViewModelFactory: (CheckoutContext) -> CheckoutViewModel
 
-    @State private var selectedBundle: TokenBundle?
+    @State private var showCheckout = false
 
     var body: some View {
         Group {
@@ -25,9 +27,10 @@ struct BuyTokensView: View {
         #endif
         .modifier(MenuToolbar())
         .task { await viewModel.load() }
-        .sheet(item: $selectedBundle) { bundle in
+        .sheet(isPresented: $showCheckout) {
             NavigationView {
-                CheckoutView(viewModel: checkoutViewModelFactory([bundle]))
+                CheckoutView(viewModel: checkoutViewModelFactory(
+                    CheckoutContext(source: "token_bundle", isCart: true)))
             }
         }
     }
@@ -45,7 +48,7 @@ struct BuyTokensView: View {
                 } else {
                     ForEach(viewModel.bundles) { bundle in
                         Button {
-                            selectedBundle = bundle
+                            selectBundle(bundle)
                         } label: {
                             bundleCard(bundle)
                         }
@@ -56,6 +59,17 @@ struct BuyTokensView: View {
             }
             .padding(24)
         }
+    }
+
+    // MARK: - Actions
+
+    private func selectBundle(_ bundle: TokenBundle) {
+        // Clear previous token_bundle items and add the selected one
+        for item in cart.items(ofType: "token_bundle") {
+            cart.remove(id: item.id)
+        }
+        cart.add(bundle.toCartItem())
+        showCheckout = true
     }
 
     // MARK: - Empty
