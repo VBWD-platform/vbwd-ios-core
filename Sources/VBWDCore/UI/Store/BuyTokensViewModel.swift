@@ -19,11 +19,11 @@ public final class BuyTokensViewModel: ObservableObject {
     public func load() async {
         isLoading = true
         errorMessage = nil
+        defer { isLoading = false }
 
         let r: TokenBundlesResponse? = try? await api.get(endpoints.tokenBundles)
         let list = r?.bundles ?? []
         bundles = list.sorted { ($0.sortOrder ?? Int.max) < ($1.sortOrder ?? Int.max) }
-        isLoading = false
     }
 
     public func retry() async { await load() }

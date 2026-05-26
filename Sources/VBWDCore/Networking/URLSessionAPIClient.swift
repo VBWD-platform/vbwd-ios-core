@@ -86,6 +86,63 @@ public final class URLSessionAPIClient: APIClient, @unchecked Sendable {
         }
     }
 
+    // MARK: - Multipart Upload
+
+    public func upload<R: Decodable>(_ path: String, fileData: Data, fileName: String,
+                                      mimeType: String, fields: [String: String]) async throws -> R {
+        let boundary = "Boundary-\(UUID().uuidString)"
+        var request = URLRequest(url: makeURL(path))
+        request.httpMethod = HTTPMethod.post.rawValue
+        request.timeoutInterval = config.timeout
+        request.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
+        for (k, v) in config.headers where k != "Content-Type" {
+            request.setValue(v, forHTTPHeaderField: k)
+        }
+        if let token = tokenProvider.token {
+            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        }
+
+        var body = Data()
+        for (key, value) in fields {
+            body.appendString("--\(boundary)\r\n")
+            body.appendString("Content-Disposition: form-data; name=\"\(key)\"\r\n\r\n")
+            body.appendString("\(value)\r\n")
+        }
+        body.appendString("--\(boundary)\r\n")
+        body.appendString("Content-Disposition: form-data; name=\"file\"; filename=\"\(fileName)\"\r\n")
+        body.appendString("Content-Type: \(mimeType)\r\n\r\n")
+        body.append(fileData)
+        body.appendString("\r\n--\(boundary)--\r\n")
+        request.httpBody = body
+
+        let data: Data
+        let response: URLResponse
+        do {
+            (data, response) = try await session.data(for: request)
+        } catch {
+            throw APIError.fromTransport(error)
+        }
+
+        guard let http = response as? HTTPURLResponse else {
+            throw APIError.transport(message: "Non-HTTP response")
+        }
+        if http.statusCode == 401 { emit(.tokenExpired) }
+        guard (200..<300).contains(http.statusCode) else {
+            throw APIError.fromResponse(
+                status: http.statusCode,
+                body: data,
+                statusText: HTTPURLResponse.localizedString(forStatusCode: http.statusCode))
+        }
+        if R.self == EmptyResponse.self, let empty = EmptyResponse() as? R {
+            return empty
+        }
+        do {
+            return try JSONDecoder().decode(R.self, from: data)
+        } catch {
+            throw APIError.fromDecoding(error)
+        }
+    }
+
     // MARK: - Core
 
     private func send<R: Decodable>(_ path: String,
@@ -150,4 +207,14 @@ public final class URLSessionAPIClient: APIClient, @unchecked Sendable {
 /// Decode target for endpoints with no/empty body (e.g. logout).
 public struct EmptyResponse: Codable, Equatable, Sendable {
     public init() {}
+}
+
+// MARK: - Multipart Helpers
+
+private extension Data {
+    mutating func appendString(_ string: String) {
+        if let data = string.data(using: .utf8) {
+            append(data)
+        }
+    }
 }

@@ -12,6 +12,8 @@ public struct CheckoutView: View {
     @ObservedObject var viewModel: CheckoutViewModel
     @Environment(\.appTheme) var theme
     @Environment(\.dismiss) var dismiss
+    @State private var payButtonOverride: String?
+    @State private var tokensSpent: Double?
 
     public init(viewModel: CheckoutViewModel) {
         self.viewModel = viewModel
@@ -32,7 +34,7 @@ public struct CheckoutView: View {
                     viewModel.completePayment(callbackURL: callbackURL)
                 }
             case let .confirmation(result):
-                CheckoutConfirmationView(result: result) {
+                CheckoutConfirmationView(result: result, tokensSpent: tokensSpent) {
                     dismiss()
                 }
             }
@@ -61,11 +63,27 @@ public struct CheckoutView: View {
                     .foregroundColor(theme.textPrimary)
 
                 orderSummaryCard
-                paymentMethodsSection
+                if viewModel.isZeroTotal {
+                    zeroTotalNotice
+                } else {
+                    if viewModel.hasMixedBillingIntervals {
+                        mixedIntervalsNotice
+                    }
+                    paymentMethodsSection
+                        .environment(\.checkoutInfo, CheckoutInfo(
+                            amount: viewModel.orderTotal,
+                            currency: viewModel.currency))
+                }
                 errorBanner
                 payButton
             }
             .padding(24)
+        }
+        .onPreferenceChange(PayButtonLabelKey.self) { label in
+            payButtonOverride = label
+        }
+        .onPreferenceChange(TokensSpentKey.self) { tokens in
+            tokensSpent = tokens
         }
     }
 
@@ -153,6 +171,49 @@ public struct CheckoutView: View {
         }
     }
 
+    // MARK: - Mixed Billing Intervals Notice
+
+    private var mixedIntervalsNotice: some View {
+        HStack(alignment: .top, spacing: 12) {
+            Image(systemName: "exclamationmark.triangle.fill")
+                .font(.title3)
+                .foregroundColor(.orange)
+            Text("Your cart contains items with different billing intervals. Stripe is not available for this order — please use another payment method.")
+                .font(.subheadline)
+                .foregroundColor(theme.textPrimary)
+        }
+        .padding(16)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(RoundedRectangle(cornerRadius: 8)
+            .fill(Color.orange.opacity(0.08)))
+        .overlay(
+            RoundedRectangle(cornerRadius: 8)
+                .stroke(Color.orange.opacity(0.2), lineWidth: 1)
+        )
+    }
+
+    // MARK: - Zero Total Notice
+
+    private var zeroTotalNotice: some View {
+        HStack(spacing: 12) {
+            Image(systemName: "info.circle.fill")
+                .font(.title3)
+                .foregroundColor(theme.accent)
+            Text("Please finish subscription by the button Pay Zero")
+                .font(.subheadline)
+                .foregroundColor(theme.textPrimary)
+        }
+        .padding(16)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(RoundedRectangle(cornerRadius: 8)
+            .fill(theme.accent.opacity(0.08)))
+        .overlay(
+            RoundedRectangle(cornerRadius: 8)
+                .stroke(theme.accent.opacity(0.2), lineWidth: 1)
+        )
+        .accessibilityIdentifier("zero_total_notice")
+    }
+
     // MARK: - Pay Button
 
     private var payButton: some View {
@@ -165,7 +226,7 @@ public struct CheckoutView: View {
                         .progressViewStyle(.circular)
                         .tint(.white)
                 } else {
-                    Text("Pay \(String(format: "%@ %.2f", viewModel.currency, viewModel.orderTotal))")
+                    Text(payButtonLabel)
                         .fontWeight(.semibold)
                 }
             }
@@ -177,6 +238,14 @@ public struct CheckoutView: View {
         }
         .disabled(!viewModel.canSubmit)
         .accessibilityIdentifier("checkout_pay_button")
+    }
+
+    private var payButtonLabel: String {
+        if viewModel.isZeroTotal {
+            return "Pay Zero"
+        }
+        return payButtonOverride
+            ?? "Pay \(String(format: "%@ %.2f", viewModel.currency, viewModel.orderTotal))"
     }
 
     // MARK: - Error
@@ -215,6 +284,7 @@ public struct CheckoutView: View {
         case let c where c.contains("stripe"): return "creditcard.fill"
         case let c where c.contains("paypal"): return "dollarsign.circle.fill"
         case let c where c.contains("invoice"): return "doc.text.fill"
+        case let c where c.contains("token"): return "dollarsign.circle"
         default: return "creditcard"
         }
     }

@@ -95,6 +95,22 @@ public struct DashboardView: View {
 
     private var tokenCard: some View {
         card("Token activity") {
+            // Balance — large display
+            Text(String(format: "%.0f", viewModel.tokenBalance))
+                .font(.system(size: 48, weight: .bold, design: .rounded))
+                .foregroundColor(theme.accent)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 4)
+                .accessibilityIdentifier("dashboard_token_balance")
+
+            Text("Token Balance")
+                .font(.subheadline)
+                .foregroundColor(theme.textSecondary)
+                .frame(maxWidth: .infinity)
+
+            Divider().padding(.vertical, 4)
+
+            // Last 7 transactions
             if viewModel.tokenTransactions.isEmpty {
                 Text("No activity").foregroundColor(theme.textSecondary)
             } else {
@@ -108,6 +124,24 @@ public struct DashboardView: View {
                     }
                 }
             }
+
+            // All transactions link
+            Divider().padding(.top, 4)
+            Button {
+                host.selectedRoute = "/store/tokens"
+            } label: {
+                HStack {
+                    Spacer()
+                    Text("All transactions")
+                        .font(.subheadline)
+                        .fontWeight(.medium)
+                    Image(systemName: "chevron.right")
+                        .font(.caption)
+                    Spacer()
+                }
+                .foregroundColor(theme.accent)
+            }
+            .accessibilityIdentifier("dashboard_all_transactions")
         }
     }
 

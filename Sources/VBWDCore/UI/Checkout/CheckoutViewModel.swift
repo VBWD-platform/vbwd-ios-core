@@ -93,7 +93,12 @@ public final class CheckoutViewModel: ObservableObject {
 
         // When opened from the cart button (isCart + no specific source),
         // show ALL cart items instead of only one source's items.
+        // Still call source.load() so it populates its internal state
+        // (e.g. loadedItems for token_bundle_ids) needed by submit().
         if context.isCart && context.source == nil {
+            if let source {
+                try? await source.load(context)
+            }
             lineItems = cart.items
         } else if let source {
             do {
@@ -112,16 +117,50 @@ public final class CheckoutViewModel: ObservableObject {
         isLoading = false
     }
 
+    /// Whether this is a zero-total checkout (e.g. free trial subscription).
+    public var isZeroTotal: Bool { orderTotal <= 0 }
+
+    /// Whether the cart contains items with different billing intervals
+    /// (e.g. monthly subscription + yearly add-on). Stripe rejects mixed intervals.
+    public private(set) var hasMixedBillingIntervals = false
+
     /// Fetches payment methods and filters by installed plugins.
+    /// When the order total is zero, only "invoice" is offered and auto-selected.
+    /// When items have mixed billing intervals, Stripe is excluded.
     public func loadPaymentMethods() async {
         let r: PaymentMethodsResponse? = try? await api.get(endpoints.paymentMethods)
         let all = r?.methods ?? []
-        let supported = components?.supportedPaymentMethodCodes()
-        if let supported, !supported.isEmpty {
-            paymentMethods = all.filter { supported.contains($0.code) }
-        } else {
-            paymentMethods = all
+
+        if isZeroTotal {
+            // Zero-total orders: only allow invoice payment
+            paymentMethods = all.filter { $0.code.lowercased() == "invoice" }
+            if let invoice = paymentMethods.first {
+                selectedMethodId = invoice.code
+            }
+            return
         }
+
+        // Detect mixed billing intervals in cart items
+        let billingPeriods = Set(
+            lineItems.compactMap { $0.metadata["billing_period"] }
+                     .filter { !$0.isEmpty }
+        )
+        hasMixedBillingIntervals = billingPeriods.count > 1
+
+        let supported = components?.supportedPaymentMethodCodes()
+        var filtered: [PaymentMethod]
+        if let supported, !supported.isEmpty {
+            filtered = all.filter { supported.contains($0.code) }
+        } else {
+            filtered = all
+        }
+
+        // Stripe does not support mixed billing intervals — exclude it
+        if hasMixedBillingIntervals {
+            filtered = filtered.filter { $0.code.lowercased() != "stripe" }
+        }
+
+        paymentMethods = filtered
     }
 
     /// Delegates submit to the active checkout source, then routes to
@@ -139,9 +178,8 @@ public final class CheckoutViewModel: ObservableObject {
             checkoutResult = result
 
             guard let invoiceId = result.invoiceId else {
-                phase = .confirmation(result)
+                finishCheckout(with: result)
                 isSubmitting = false
-                events?.emit(AppEvents.checkoutCompleted)
                 return
             }
 
@@ -150,15 +188,14 @@ public final class CheckoutViewModel: ObservableObject {
                 let action = try await handler(invoiceId)
                 switch action {
                 case .showConfirmation:
-                    phase = .confirmation(result)
-                    events?.emit(AppEvents.checkoutCompleted)
+                    // Instant payment (e.g. token balance) succeeded — mark as paid
+                    finishCheckout(with: result.withStatus("paid"))
                 case let .openURL(url, sessionId):
                     phase = .processingPayment(url, sessionId: sessionId)
                 }
             } else {
                 // No handler → straight to confirmation (invoice)
-                phase = .confirmation(result)
-                events?.emit(AppEvents.checkoutCompleted)
+                finishCheckout(with: result)
             }
         } catch {
             errorMessage = (error as? APIError)?.message ?? error.localizedDescription
@@ -178,26 +215,53 @@ public final class CheckoutViewModel: ObservableObject {
                 await pollPaymentStatus(sessionId: sessionId)
             }
         } else if let result = checkoutResult {
-            phase = .confirmation(result)
-            events?.emit(AppEvents.checkoutCompleted)
+            finishCheckout(with: result)
         }
     }
 
     /// Called when `ASWebAuthenticationSession` returns a callback URL from the
     /// payment provider (e.g. `vbwd://stripe-callback/success?session_id=cs_...`).
     /// Extracts the `session_id` query parameter and polls payment status.
+    /// When the user cancels (nil URL), returns to the form immediately.
     public func completePayment(callbackURL: URL?) {
-        if let callbackURL,
-           let components = URLComponents(url: callbackURL, resolvingAgainstBaseURL: false),
+        guard let callbackURL else {
+            // User closed the payment browser — return to form immediately
+            errorMessage = "Payment was cancelled."
+            phase = .form
+            isSubmitting = false
+            return
+        }
+
+        // Detect cancel path in callback URL (e.g. vbwd://stripe-callback/cancel)
+        let path = callbackURL.path.lowercased()
+        if path.contains("cancel") {
+            errorMessage = "Payment was cancelled."
+            phase = .form
+            isSubmitting = false
+            return
+        }
+
+        if let components = URLComponents(url: callbackURL, resolvingAgainstBaseURL: false),
            let sessionId = components.queryItems?.first(where: { $0.name == "session_id" })?.value,
            !sessionId.isEmpty {
             Task {
                 await pollPaymentStatus(sessionId: sessionId)
             }
         } else {
-            // No callback URL (user cancelled) or no session_id — fall back
+            // Callback URL present but no session_id — fall back to polling
             completePayment()
         }
+    }
+
+    // MARK: - Checkout Completion
+
+    /// Transitions to confirmation, clears the cart, and emits the
+    /// `checkoutCompleted` event. Call this instead of setting `phase`
+    /// directly so the cart is always cleaned up.
+    private func finishCheckout(with result: CheckoutResult) {
+        phase = .confirmation(result)
+        cart.clear()
+        events?.emit(AppEvents.checkoutCompleted)
     }
 
     // MARK: - Payment Status Polling
@@ -234,13 +298,12 @@ public final class CheckoutViewModel: ObservableObject {
                             paymentMethod: invoice.paymentMethod,
                             lineItems: invoice.lineItems)
                         result = CheckoutResult(invoice: updated, message: result.message)
-                        phase = .confirmation(result)
+                        finishCheckout(with: result)
                     } else {
-                        phase = .confirmation(
+                        finishCheckout(with:
                             checkoutResult ?? CheckoutResult(invoice: nil, message: "Payment successful"))
                     }
                     events?.emit(AppEvents.paymentSucceeded)
-                    events?.emit(AppEvents.checkoutCompleted)
                     return
                 } else if status == "failed" || status == "expired" {
                     errorMessage = "Payment failed. Please try again."
@@ -255,8 +318,7 @@ public final class CheckoutViewModel: ObservableObject {
 
         // Timeout — show confirmation with current (pending) status
         if let result = checkoutResult {
-            phase = .confirmation(result)
-            events?.emit(AppEvents.checkoutCompleted)
+            finishCheckout(with: result)
         }
     }
 }

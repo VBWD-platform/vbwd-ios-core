@@ -26,6 +26,11 @@ public protocol APIClient: AnyObject, Sendable {
     /// decoding. Not all implementations support this; the default throws.
     func getData(_ path: String) async throws -> Data
 
+    /// Multipart file upload. Sends the file as `multipart/form-data` with
+    /// the field name `"file"` and additional text fields from `fields`.
+    func upload<R: Decodable>(_ path: String, fileData: Data, fileName: String,
+                               mimeType: String, fields: [String: String]) async throws -> R
+
     /// Set/clear the bearer token (web `setToken`/`clearToken`).
     func setToken(_ token: String?)
 
@@ -42,5 +47,9 @@ public extension APIClient {
     }
     func getData(_ path: String) async throws -> Data {
         throw APIError.transport(message: "getData not supported")
+    }
+    func upload<R: Decodable>(_ path: String, fileData: Data, fileName: String,
+                               mimeType: String, fields: [String: String]) async throws -> R {
+        throw APIError.transport(message: "upload not supported")
     }
 }

@@ -8,6 +8,15 @@ import Foundation
 public final class Cart: ObservableObject {
     @Published public private(set) var items: [CartItem] = []
 
+    /// Incremented each time a view requests the cart checkout sheet to open.
+    /// AppRoot observes this via `onChange` and presents the sheet.
+    @Published public var checkoutRequestCount = 0
+
+    /// Call to request opening the cart checkout sheet from any view.
+    public func requestCheckout() {
+        checkoutRequestCount += 1
+    }
+
     public init() {}
 
     // MARK: - Mutations

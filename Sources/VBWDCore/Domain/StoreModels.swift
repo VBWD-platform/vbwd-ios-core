@@ -85,6 +85,22 @@ public struct CheckoutResult: Codable, Equatable, Sendable {
     /// confirmation page navigation.
     public var invoiceId: String? { invoice?.id }
     public var status: String? { invoice?.status }
+
+    /// Returns a copy with the invoice status overridden.
+    public func withStatus(_ newStatus: String) -> CheckoutResult {
+        guard let inv = invoice else { return self }
+        return CheckoutResult(
+            invoice: CheckoutInvoice(
+                id: inv.id,
+                invoiceNumber: inv.invoiceNumber,
+                amount: inv.amount,
+                totalAmount: inv.totalAmount,
+                currency: inv.currency,
+                status: newStatus,
+                paymentMethod: inv.paymentMethod,
+                lineItems: inv.lineItems),
+            message: message)
+    }
 }
 
 /// Subset of the invoice payload returned by `POST /user/checkout`.

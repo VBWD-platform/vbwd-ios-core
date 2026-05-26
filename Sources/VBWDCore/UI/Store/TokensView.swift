@@ -31,6 +31,9 @@ struct TokensView: View {
             VStack(alignment: .leading, spacing: 16) {
                 Text("Tokens").font(.largeTitle).bold()
                     .foregroundColor(theme.textPrimary)
+                Text("Showing only the latest 33 transactions")
+                    .font(.subheadline)
+                    .foregroundColor(theme.textSecondary)
 
                 balanceCard
                 transactionsCard

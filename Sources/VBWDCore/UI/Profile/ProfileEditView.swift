@@ -61,6 +61,12 @@ struct ProfileEditView: View {
                 }
             }
 
+            // Plugin-contributed Profile* sections (before core fields)
+            let pluginSections = host.components.profileComponents()
+            ForEach(pluginSections, id: \.name) { section in
+                section.factory()
+            }
+
             // Account info (read-only)
             Section("Account") {
                 HStack {
@@ -175,11 +181,6 @@ struct ProfileEditView: View {
                 .accessibilityIdentifier("profile_change_password_button")
             }
 
-            // Plugin-contributed Profile* sections
-            let pluginSections = host.components.profileComponents()
-            ForEach(pluginSections, id: \.name) { section in
-                section.factory()
-            }
         }
     }
 }

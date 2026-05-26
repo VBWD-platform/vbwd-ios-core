@@ -5,7 +5,14 @@ import SwiftUI
 /// Mirrors the web `CheckoutConfirmationView.vue`.
 struct CheckoutConfirmationView: View {
     let result: CheckoutResult
+    let tokensSpent: Double?
     let onDone: () -> Void
+
+    init(result: CheckoutResult, tokensSpent: Double? = nil, onDone: @escaping () -> Void) {
+        self.result = result
+        self.tokensSpent = tokensSpent
+        self.onDone = onDone
+    }
 
     @Environment(\.appTheme) var theme
 
@@ -22,6 +29,7 @@ struct CheckoutConfirmationView: View {
             VStack(spacing: 20) {
                 statusBanner
                 if invoice != nil {
+                    tokenPaymentCard
                     invoiceDetailsCard
                     lineItemsCard
                 }
@@ -71,17 +79,62 @@ struct CheckoutConfirmationView: View {
                 statusBadge
             }
 
-            if let amount = displayAmount {
-                detailRow("Amount", amount)
-            }
-
             if let method = invoice?.paymentMethod, !method.isEmpty {
-                detailRow("Payment Method", method.capitalized)
+                detailRow("Payment Method", formatPaymentMethod(method))
             }
         }
         .padding(20)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(RoundedRectangle(cornerRadius: 8).fill(theme.cardBackground))
+    }
+
+    // MARK: - Token Payment Card
+
+    private var isTokenPayment: Bool {
+        invoice?.paymentMethod?.lowercased() == "token_balance"
+    }
+
+    @ViewBuilder
+    private var tokenPaymentCard: some View {
+        if isTokenPayment {
+            VStack(alignment: .leading, spacing: 12) {
+                HStack(spacing: 8) {
+                    Image(systemName: "circle.circle.fill")
+                        .foregroundColor(theme.success)
+                    Text("Paid with Tokens")
+                        .font(.headline).fontWeight(.semibold)
+                        .foregroundColor(theme.textPrimary)
+                }
+
+                Divider()
+
+                if let tokens = tokensSpent {
+                    HStack {
+                        Text("Tokens spent")
+                            .font(.subheadline)
+                            .foregroundColor(theme.textSecondary)
+                        Spacer()
+                        Text(formatTokens(tokens))
+                            .font(.subheadline)
+                            .fontWeight(.bold)
+                            .foregroundColor(theme.textPrimary)
+                    }
+                }
+            }
+            .padding(16)
+            .background(RoundedRectangle(cornerRadius: 8).fill(theme.cardBackground))
+            .overlay(
+                RoundedRectangle(cornerRadius: 8)
+                    .stroke(theme.success.opacity(0.3), lineWidth: 1)
+            )
+        }
+    }
+
+    private func formatTokens(_ value: Double) -> String {
+        if value == value.rounded() {
+            return String(format: "%.0f tokens", value)
+        }
+        return String(format: "%.2f tokens", value)
     }
 
     // MARK: - Line Items
@@ -239,5 +292,16 @@ struct CheckoutConfirmationView: View {
 
     private var statusBackground: Color {
         statusColor.opacity(0.12)
+    }
+
+    private func formatPaymentMethod(_ method: String) -> String {
+        switch method.lowercased() {
+        case "stripe": return "Stripe"
+        case "paypal": return "PayPal"
+        case "invoice": return "Bank Transfer"
+        case "apple_pay", "apple-pay": return "Apple Pay"
+        case "token_balance": return "Token Balance"
+        default: return method.capitalized
+        }
     }
 }

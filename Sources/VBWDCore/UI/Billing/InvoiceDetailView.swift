@@ -4,6 +4,7 @@ import SwiftUI
 /// PDF download button. Port of the web `InvoiceDetail.vue`.
 struct InvoiceDetailView: View {
     @ObservedObject var viewModel: InvoiceDetailViewModel
+    @EnvironmentObject var host: PluginHost
     @Environment(\.appTheme) var theme
 
     var body: some View {
@@ -22,7 +23,7 @@ struct InvoiceDetailView: View {
         #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
         #endif
-        .modifier(MenuToolbar())
+        .modifier(BackButtonToolbar(backRoute: "/billing/invoices"))
         .task { await viewModel.load() }
         #if os(iOS)
         .sheet(isPresented: pdfPresented) {
@@ -52,6 +53,9 @@ struct InvoiceDetailView: View {
 
                 // Status banner
                 statusBanner(inv)
+
+                // Token payment card (when paid with tokens)
+                tokenPaymentCard(inv)
 
                 // Details card
                 detailsCard(inv)
@@ -98,6 +102,42 @@ struct InvoiceDetailView: View {
         .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(RoundedRectangle(cornerRadius: 8).fill(color.opacity(0.08)))
+    }
+
+    // MARK: - Token Payment Card
+
+    @ViewBuilder
+    private func tokenPaymentCard(_ inv: Invoice) -> some View {
+        if inv.paymentMethod?.lowercased() == "token_balance" {
+            VStack(alignment: .leading, spacing: 12) {
+                HStack(spacing: 8) {
+                    Image(systemName: "circle.circle.fill")
+                        .foregroundColor(theme.success)
+                    Text("Paid with Tokens")
+                        .font(.headline).fontWeight(.semibold)
+                        .foregroundColor(theme.textPrimary)
+                }
+
+                Divider()
+
+                HStack {
+                    Text("Amount paid")
+                        .font(.subheadline)
+                        .foregroundColor(theme.textSecondary)
+                    Spacer()
+                    Text(formatAmount(inv.totalAmount ?? inv.amount ?? "0.00", inv.currency))
+                        .font(.subheadline)
+                        .fontWeight(.bold)
+                        .foregroundColor(theme.textPrimary)
+                }
+            }
+            .padding(16)
+            .background(RoundedRectangle(cornerRadius: 8).fill(theme.cardBackground))
+            .overlay(
+                RoundedRectangle(cornerRadius: 8)
+                    .stroke(theme.success.opacity(0.3), lineWidth: 1)
+            )
+        }
     }
 
     // MARK: - Details Card
@@ -300,6 +340,7 @@ struct InvoiceDetailView: View {
         case "paypal": return "PayPal"
         case "invoice": return "Bank Transfer"
         case "apple_pay", "apple-pay": return "Apple Pay"
+        case "token_balance": return "Token Balance"
         default: return method.capitalized
         }
     }

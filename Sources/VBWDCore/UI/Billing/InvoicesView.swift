@@ -1,8 +1,7 @@
 import SwiftUI
 
-/// Full invoice list screen. Port of the web `Invoices.vue`:
-/// date, invoice number, amount with currency, status badge.
-/// Sprint 06: Billing > Invoices menu item.
+/// Full invoice list screen with lazy-load pagination (10 per page) and
+/// quick search. Port of the web `Invoices.vue`.
 struct InvoicesView: View {
     @ObservedObject var viewModel: InvoicesViewModel
     @EnvironmentObject var host: PluginHost
@@ -34,17 +33,49 @@ struct InvoicesView: View {
                 Text("Invoices").font(.largeTitle).bold()
                     .foregroundColor(theme.textPrimary)
 
-                if viewModel.invoices.isEmpty {
+                // Quick search field
+                HStack {
+                    Image(systemName: "magnifyingglass")
+                        .foregroundColor(theme.textSecondary)
+                    TextField("Search invoices…", text: $viewModel.searchText)
+                        .textFieldStyle(.plain)
+                        .foregroundColor(theme.textPrimary)
+                    if !viewModel.searchText.isEmpty {
+                        Button {
+                            viewModel.searchText = ""
+                        } label: {
+                            Image(systemName: "xmark.circle.fill")
+                                .foregroundColor(theme.textSecondary)
+                        }
+                    }
+                }
+                .padding(12)
+                .background(RoundedRectangle(cornerRadius: 8).fill(theme.cardBackground))
+                .accessibilityIdentifier("invoices_search_field")
+
+                if viewModel.filteredInvoices.isEmpty {
                     emptyCard
                 } else {
-                    ForEach(viewModel.invoices) { inv in
-                        Button {
-                            host.selectedRoute = "/billing/invoice/\(inv.id)"
-                        } label: {
-                            invoiceRow(inv)
+                    LazyVStack(spacing: 12) {
+                        ForEach(viewModel.filteredInvoices) { inv in
+                            Button {
+                                host.selectedRoute = "/billing/invoice/\(inv.id)"
+                            } label: {
+                                invoiceRow(inv)
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityIdentifier("invoice_row_\(inv.id)")
+                            .task {
+                                await viewModel.loadMoreIfNeeded(current: inv)
+                            }
                         }
-                        .buttonStyle(.plain)
-                        .accessibilityIdentifier("invoice_row_\(inv.id)")
+                    }
+
+                    // Loading more indicator
+                    if viewModel.isLoadingMore {
+                        ProgressView()
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 8)
                     }
                 }
             }
@@ -59,7 +90,7 @@ struct InvoicesView: View {
             Image(systemName: "doc.text")
                 .font(.largeTitle)
                 .foregroundColor(theme.textSecondary)
-            Text("No invoices")
+            Text(viewModel.searchText.isEmpty ? "No invoices" : "No matching invoices")
                 .foregroundColor(theme.textSecondary)
         }
         .frame(maxWidth: .infinity)
@@ -145,7 +176,6 @@ struct InvoicesView: View {
     // MARK: - Formatters
 
     private func formatDate(_ iso: String) -> String {
-        // Show just the date portion (first 10 chars of ISO string)
         String(iso.prefix(10))
     }
 

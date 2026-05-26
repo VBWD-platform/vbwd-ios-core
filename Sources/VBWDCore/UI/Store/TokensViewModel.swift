@@ -42,10 +42,9 @@ public final class TokensViewModel: ObservableObject {
     }
 
     private func fetchTransactions() async -> [TokenTransaction] {
-        // Strip the dashboard's ?limit=10 to get full history.
-        let path = dashboardEndpoints.tokenTransactions
+        let base = dashboardEndpoints.tokenTransactions
             .components(separatedBy: "?").first ?? dashboardEndpoints.tokenTransactions
-        let r: TokenTransactionsResponse? = try? await api.get(path)
+        let r: TokenTransactionsResponse? = try? await api.get(base + "?limit=33")
         return r?.transactions ?? []
     }
 }

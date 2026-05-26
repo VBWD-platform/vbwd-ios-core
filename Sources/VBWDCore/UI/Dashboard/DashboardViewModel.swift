@@ -70,6 +70,7 @@ public final class DashboardViewModel: ObservableObject {
     public func load() async {
         isLoading = true
         errorMessage = nil
+        defer { isLoading = false }
 
         async let inv = fetchInvoices()
         async let bal = fetchBalance()
@@ -79,7 +80,6 @@ public final class DashboardViewModel: ObservableObject {
         invoices = i
         tokenBalance = b
         tokenTransactions = t
-        isLoading = false
     }
 
     public func retry() async { await load() }

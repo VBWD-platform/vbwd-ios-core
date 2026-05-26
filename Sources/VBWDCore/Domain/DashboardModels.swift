@@ -71,7 +71,7 @@ public struct DashboardEndpoints: Equatable, Sendable {
     public var invoices: String
 
     public init(tokenBalance: String = "/user/tokens/balance",
-                tokenTransactions: String = "/user/tokens/transactions?limit=10",
+                tokenTransactions: String = "/user/tokens/transactions?limit=7",
                 invoices: String = "/user/invoices") {
         self.tokenBalance = tokenBalance
         self.tokenTransactions = tokenTransactions

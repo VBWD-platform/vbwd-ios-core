@@ -18,7 +18,9 @@ public enum Navigator {
                                userPermissions: [String],
                                evaluator: PermissionEvaluator = PermissionEvaluator())
         -> RouteResolution {
-        guard let route = routes.first(where: { $0.path == path }) else {
+        guard let route = routes.first(where: { r in
+            r.path == path || (r.matchPrefix && path.hasPrefix(r.path))
+        }) else {
             return .notFound
         }
         if route.requiresAuth && !isAuthenticated {

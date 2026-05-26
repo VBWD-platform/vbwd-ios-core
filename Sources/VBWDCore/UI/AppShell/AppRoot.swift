@@ -1,4 +1,5 @@
 import SwiftUI
+import Combine
 
 /// Top-level composed root: boots the plugin host, wraps content in burger menu,
 /// shows Login (signed out) or Dashboard (signed in) with core cards + plugin
@@ -50,12 +51,18 @@ public struct AppRoot: View {
         .environmentObject(container.cart)
         .environment(\.showCartCheckout, $showCartCheckout)
         .sheet(isPresented: $showCartCheckout) {
-            NavigationView {
-                CheckoutView(viewModel: container.makeCheckoutViewModel(
+            CartCheckoutContainer(checkoutViewModelFactory: {
+                container.makeCheckoutViewModel(
                     context: CheckoutContext(isCart: true),
                     components: host.components,
-                    events: host.sdk.events))
-            }
+                    events: host.sdk.events)
+            })
+            .environmentObject(container.cart)
+            .environmentObject(host)
+            .environment(\.appTheme, themeManager.currentTheme)
+        }
+        .onReceive(container.cart.$checkoutRequestCount.dropFirst()) { _ in
+            showCartCheckout = true
         }
         .task {
             if !booted {
@@ -91,7 +98,9 @@ public struct AppRoot: View {
                 viewModel: container.makeInvoiceDetailViewModel(
                     invoiceId: String(route.dropFirst("/billing/invoice/".count))))
         case let route?:
-            if let pluginRoute = host.routes.first(where: { $0.path == route }) {
+            if let pluginRoute = host.routes.first(where: { r in
+                r.path == route || (r.matchPrefix && route.hasPrefix(r.path))
+            }) {
                 pluginRoute.view()
                     #if os(iOS)
                     .navigationBarTitleDisplayMode(.inline)

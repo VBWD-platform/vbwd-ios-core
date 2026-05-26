@@ -4,12 +4,13 @@ import SwiftUI
 /// Wraps the main content and overlays the menu when opened.
 public struct BurgerMenuContainer<Content: View>: View {
     @State private var isMenuOpen = false
+    @EnvironmentObject private var host: PluginHost
     let content: Content
-    
+
     public init(@ViewBuilder content: () -> Content) {
         self.content = content()
     }
-    
+
     public var body: some View {
         ZStack(alignment: .leading) {
             // Main content
@@ -30,7 +31,14 @@ public struct BurgerMenuContainer<Content: View>: View {
                         }
                     }
                 )
-            
+
+            // Plugin overlay components (Overlay* convention) — hidden when menu is open
+            if !isMenuOpen {
+                ForEach(host.sdk.components.overlayComponents(), id: \.name) { item in
+                    item.factory()
+                }
+            }
+
             // Side menu
             if isMenuOpen {
                 SideMenu(onClose: {

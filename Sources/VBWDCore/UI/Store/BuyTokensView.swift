@@ -6,7 +6,6 @@ import SwiftUI
 struct BuyTokensView: View {
     @ObservedObject var viewModel: BuyTokensViewModel
     @Environment(\.appTheme) var theme
-    @Environment(\.showCartCheckout) var showCartCheckout
     let cart: Cart
 
     @State private var addedBundleName: String?
@@ -26,7 +25,7 @@ struct BuyTokensView: View {
         .navigationBarTitleDisplayMode(.inline)
         #endif
         .modifier(MenuToolbar())
-        .task { await viewModel.load() }
+        .task(id: ObjectIdentifier(viewModel)) { await viewModel.load() }
     }
 
     // MARK: - Content
@@ -84,7 +83,7 @@ struct BuyTokensView: View {
         cart.add(bundle.toCartItem())
         // Only open checkout automatically if the cart was empty before adding
         if wasEmpty {
-            showCartCheckout.wrappedValue = true
+            cart.requestCheckout()
         } else {
             withAnimation { addedBundleName = bundle.name }
         }

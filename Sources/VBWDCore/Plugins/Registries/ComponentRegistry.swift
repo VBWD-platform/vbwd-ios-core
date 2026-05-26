@@ -62,6 +62,13 @@ public final class ComponentRegistry {
              .compactMap { n in components[n].map { (n, $0) } }
     }
 
+    /// Overlay convention: components named `Overlay*`, rendered floating on
+    /// top of the main content. Hidden when the side menu is open.
+    public func overlayComponents() -> [(name: String, factory: ComponentFactory)] {
+        order.filter { $0.hasPrefix("Overlay") }
+             .compactMap { n in components[n].map { (n, $0) } }
+    }
+
     /// Checkout extension convention: components named `Checkout*`,
     /// in registration order. Plugins register these to inject sections into
     /// the checkout screen (e.g. discount codes, shipping, insurance).

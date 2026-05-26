@@ -7,16 +7,21 @@ public struct PluginRoute {
     public let name: String
     public let requiresAuth: Bool
     public let requiredUserPermission: String?
+    /// When `true`, any route starting with `path` will match (e.g. path
+    /// `/meinchat` matches `/meinchat/nickname`). Default is `false` (exact).
+    public let matchPrefix: Bool
     public let view: @MainActor () -> AnyView
 
     public init(path: String, name: String,
                 requiresAuth: Bool = false,
                 requiredUserPermission: String? = nil,
+                matchPrefix: Bool = false,
                 view: @MainActor @escaping () -> AnyView) {
         self.path = path
         self.name = name
         self.requiresAuth = requiresAuth
         self.requiredUserPermission = requiredUserPermission
+        self.matchPrefix = matchPrefix
         self.view = view
     }
 }
