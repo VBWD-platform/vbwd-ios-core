@@ -5,6 +5,7 @@ import SwiftUI
 public struct BurgerMenuContainer<Content: View>: View {
     @State private var isMenuOpen = false
     @EnvironmentObject private var host: PluginHost
+    @EnvironmentObject private var session: AuthSession
     let content: Content
 
     public init(@ViewBuilder content: () -> Content) {
@@ -32,8 +33,9 @@ public struct BurgerMenuContainer<Content: View>: View {
                     }
                 )
 
-            // Plugin overlay components (Overlay* convention) — hidden when menu is open
-            if !isMenuOpen {
+            // Plugin overlay components (Overlay* convention) — only when
+            // authenticated and menu is closed so they don't block the login form.
+            if session.isAuthenticated && !isMenuOpen {
                 ForEach(host.sdk.components.overlayComponents(), id: \.name) { item in
                     item.factory()
                 }

@@ -31,6 +31,7 @@ public struct PluginRoute {
 /// the registries, registry, or composition root (ISP/DIP).
 public protocol PlatformSDK: AnyObject, Sendable {
     var api: APIClient { get }
+    var apiConfig: APIClientConfig { get }
     var events: EventBus { get }
 
     func addRoute(_ route: PluginRoute) throws
@@ -67,6 +68,7 @@ public protocol PlatformSDK: AnyObject, Sendable {
 /// plugins still see only the `PlatformSDK` protocol.
 public final class DefaultPlatformSDK: PlatformSDK, @unchecked Sendable {
     public let api: APIClient
+    public let apiConfig: APIClientConfig
     public let events: EventBus
     public let routes: RouteRegistry
     public let components: ComponentRegistry
@@ -77,6 +79,7 @@ public final class DefaultPlatformSDK: PlatformSDK, @unchecked Sendable {
     public let checkoutSources: CheckoutSourceRegistry  // Sprint 06c
 
     public init(api: APIClient,
+                apiConfig: APIClientConfig,
                 events: EventBus,
                 routes: RouteRegistry = RouteRegistry(),
                 components: ComponentRegistry = ComponentRegistry(),
@@ -86,6 +89,7 @@ public final class DefaultPlatformSDK: PlatformSDK, @unchecked Sendable {
                 cart: Cart,
                 checkoutSources: CheckoutSourceRegistry) {
         self.api = api
+        self.apiConfig = apiConfig
         self.events = events
         self.routes = routes
         self.components = components

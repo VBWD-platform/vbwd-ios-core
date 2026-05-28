@@ -9,7 +9,7 @@ struct CartCheckoutContainer: View {
     @State private var checkoutVM: CheckoutViewModel?
 
     var body: some View {
-        NavigationView {
+        NavigationStack {
             if showCheckout, let vm = checkoutVM {
                 CheckoutView(viewModel: vm)
             } else {
@@ -19,9 +19,6 @@ struct CartCheckoutContainer: View {
                 })
             }
         }
-        #if os(iOS)
-        .navigationViewStyle(.stack)
-        #endif
     }
 }
 

@@ -18,11 +18,13 @@ public final class PluginHost: ObservableObject {
     @Published public var selectedRoute: String? = nil
 
     public init(api: APIClient,
+                apiConfig: APIClientConfig = APIClientConfig(baseURL: SDKContainer.defaultBaseURL),
                 manifestLoader: PluginManifestLoader,
                 plugins: [Plugin],
                 cart: Cart = Cart(),
                 checkoutSources: CheckoutSourceRegistry = CheckoutSourceRegistry()) {
-        self.sdk = DefaultPlatformSDK(api: api, events: DefaultEventBus(api: api),
+        self.sdk = DefaultPlatformSDK(api: api, apiConfig: apiConfig,
+                                      events: DefaultEventBus(api: api),
                                       cart: cart, checkoutSources: checkoutSources)
         self.manifestLoader = manifestLoader
         self.plugins = plugins

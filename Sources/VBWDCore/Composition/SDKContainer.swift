@@ -104,7 +104,7 @@ public final class SDKContainer {
                                fallback: PluginManifest = .empty) -> PluginHost {
         let loader = manifestLoader ?? RemotePluginManifestLoader(
             api: apiClient, path: manifestPath, fallback: fallback)
-        return PluginHost(api: apiClient, manifestLoader: loader, plugins: plugins,
-                          cart: cart, checkoutSources: checkoutSources)
+        return PluginHost(api: apiClient, apiConfig: config, manifestLoader: loader,
+                          plugins: plugins, cart: cart, checkoutSources: checkoutSources)
     }
 }

@@ -9,7 +9,9 @@ final class CounterStore: ObservableObject, @unchecked Sendable { @Published var
 /// Builds a `DefaultPlatformSDK` wired with spies for tests.
 @MainActor
 func makeSDK(_ api: SpyAPIClient = SpyAPIClient()) -> DefaultPlatformSDK {
-    DefaultPlatformSDK(api: api, events: DefaultEventBus(api: api),
+    DefaultPlatformSDK(api: api,
+                       apiConfig: APIClientConfig(baseURL: SDKContainer.defaultBaseURL),
+                       events: DefaultEventBus(api: api),
                        cart: Cart(), checkoutSources: CheckoutSourceRegistry())
 }
 

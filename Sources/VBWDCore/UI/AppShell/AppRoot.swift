@@ -3,7 +3,7 @@ import Combine
 
 /// Top-level composed root: boots the plugin host, wraps content in burger menu,
 /// shows Login (signed out) or Dashboard (signed in) with core cards + plugin
-/// widgets. Sprint 03: adds BurgerMenuContainer and NavigationView.
+/// widgets. Sprint 03: adds BurgerMenuContainer and NavigationStack.
 /// Sprint 04: adds ProfileEditView. Sprint 05: injects ThemeManager + environment.
 @MainActor
 public struct AppRoot: View {
@@ -27,7 +27,7 @@ public struct AppRoot: View {
 
     public var body: some View {
         BurgerMenuContainer {
-            NavigationView {
+            NavigationStack {
                 Group {
                     switch RootRouter.route(for: session.state) {
                     case .login:
@@ -39,9 +39,6 @@ public struct AppRoot: View {
                     }
                 }
             }
-            #if os(iOS)
-            .navigationViewStyle(.stack)
-            #endif
         }
         .environment(\.appTheme, themeManager.currentTheme)
         .preferredColorScheme(themeManager.currentTheme.preferredColorScheme)
