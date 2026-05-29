@@ -6,17 +6,26 @@ import Foundation
 ///
 /// Shape mirrors the JSON:
 /// ```json
-/// { "api_base_url": "http://localhost:5000/api/v1" }
+/// {
+///   "api_base_url": "http://localhost:5000/api/v1",
+///   "tarif_plan_root_cat_slug": "ios"
+/// }
 /// ```
 public struct VBWDConfig: Codable, Equatable, Sendable {
     public let apiBaseUrl: String
+    /// Restricts the visible tariff-plan catalogue to this category (and, when
+    /// the backend supports it, its descendants). Forwarded as `?category=<slug>`
+    /// to `/tarif-plans` — see `vbwd-backend` `user_plans.py`. `nil` = show all.
+    public let tarifPlanRootCatSlug: String?
 
     enum CodingKeys: String, CodingKey {
         case apiBaseUrl = "api_base_url"
+        case tarifPlanRootCatSlug = "tarif_plan_root_cat_slug"
     }
 
-    public init(apiBaseUrl: String) {
+    public init(apiBaseUrl: String, tarifPlanRootCatSlug: String? = nil) {
         self.apiBaseUrl = apiBaseUrl
+        self.tarifPlanRootCatSlug = tarifPlanRootCatSlug
     }
 
     /// Parsed `apiBaseUrl` as a `URL`. Falls back to `SDKContainer.defaultBaseURL`

@@ -12,6 +12,7 @@ public struct AppRoot: View {
     @ObservedObject private var themeManager: ThemeManager
     private let container: SDKContainer
     @State private var booted = false
+    @State private var isReady = false
     @State private var showCartCheckout = false
 
     public init(container: SDKContainer,
@@ -29,13 +30,17 @@ public struct AppRoot: View {
         BurgerMenuContainer {
             NavigationStack {
                 Group {
-                    switch RootRouter.route(for: session.state) {
-                    case .login:
-                        LoginView(viewModel: container.makeLoginViewModel())
-                    case .loading:
-                        ProgressView()
-                    case let .dashboard(user):
-                        routedContent(user: user)
+                    if !isReady {
+                        SplashView()
+                    } else {
+                        switch RootRouter.route(for: session.state) {
+                        case .login:
+                            LoginView(viewModel: container.makeLoginViewModel())
+                        case .loading:
+                            SplashView()
+                        case let .dashboard(user):
+                            routedContent(user: user)
+                        }
                     }
                 }
             }
@@ -66,6 +71,7 @@ public struct AppRoot: View {
                 booted = true
                 await host.bootstrap()
                 session.start()
+                isReady = true
             }
         }
     }
