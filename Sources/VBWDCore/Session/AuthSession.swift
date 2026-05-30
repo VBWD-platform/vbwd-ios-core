@@ -9,9 +9,15 @@ public final class AuthSession: ObservableObject {
     @Published public private(set) var state: AuthState = .signedOut
 
     private let service: AuthService
+    /// Optional event bus — when injected, the session emits
+    /// `AppEvents.authLogin` on successful login + restore so plugins
+    /// (e.g. meinchat's limits service) can trigger their first auth-gated
+    /// fetch without polling for state changes.
+    private let events: EventBus?
 
-    public init(service: AuthService) {
+    public init(service: AuthService, events: EventBus? = nil) {
         self.service = service
+        self.events = events
     }
 
     /// Web `isAuthenticated`: token && user (here: an authenticated state).
@@ -29,6 +35,7 @@ public final class AuthSession: ObservableObject {
     public func start() {
         if let user = service.restore() {
             state = .authenticated(user)
+            events?.emit(AppEvents.authLogin, nil)
         } else {
             state = .signedOut
         }
@@ -39,6 +46,7 @@ public final class AuthSession: ObservableObject {
         do {
             let user = try await service.login(.init(email: email, password: password))
             state = .authenticated(user)
+            events?.emit(AppEvents.authLogin, nil)
         } catch {
             let message = (error as? APIError)?.message ?? "Login failed"
             state = .error(message)

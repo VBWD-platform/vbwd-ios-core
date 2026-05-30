@@ -22,9 +22,14 @@ public final class PluginHost: ObservableObject {
                 manifestLoader: PluginManifestLoader,
                 plugins: [Plugin],
                 cart: Cart = Cart(),
-                checkoutSources: CheckoutSourceRegistry = CheckoutSourceRegistry()) {
+                checkoutSources: CheckoutSourceRegistry = CheckoutSourceRegistry(),
+                events: EventBus? = nil) {
+        // Reuse the host-provided bus when given (so AuthSession + plugins
+        // share one channel — `AppEvents.authLogin` reaches subscribers);
+        // fall back to a fresh bus for legacy callers + tests.
+        let bus = events ?? DefaultEventBus(api: api)
         self.sdk = DefaultPlatformSDK(api: api, apiConfig: apiConfig,
-                                      events: DefaultEventBus(api: api),
+                                      events: bus,
                                       cart: cart, checkoutSources: checkoutSources)
         self.manifestLoader = manifestLoader
         self.plugins = plugins

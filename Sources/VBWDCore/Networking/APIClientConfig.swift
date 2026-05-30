@@ -10,12 +10,18 @@ public struct APIClientConfig: Equatable, Sendable {
     public let baseURL: URL
     public let timeout: TimeInterval
     public let headers: [String: String]
+    /// HTTP traffic logger. Defaults to `.bodies` in DEBUG, `.off` in
+    /// release. Override to silence logs in DEBUG (e.g. on a noisy CI run)
+    /// or to opt-in in release for forensic capture.
+    public let logging: APITrafficLogger
 
     public init(baseURL: URL,
                 timeout: TimeInterval = APIClientConfig.defaultTimeout,
-                headers: [String: String] = [:]) {
+                headers: [String: String] = [:],
+                logging: APITrafficLogger = .default) {
         self.baseURL = baseURL
         self.timeout = timeout
+        self.logging = logging
         // Default first, caller-supplied headers override (web spread order).
         var merged = ["Content-Type": "application/json"]
         #if os(iOS)

@@ -53,18 +53,26 @@ public final class URLSessionAPIClient: APIClient, @unchecked Sendable {
         if let token = tokenProvider.token {
             request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         }
+        config.logging.logRequest(method: HTTPMethod.get.rawValue, url: request.url ?? makeURL(path), body: nil)
 
         let data: Data
         let response: URLResponse
         do {
             (data, response) = try await session.data(for: request)
         } catch {
+            config.logging.logTransportError(method: HTTPMethod.get.rawValue,
+                                             url: request.url ?? makeURL(path),
+                                             error: error)
             throw APIError.fromTransport(error)
         }
 
         guard let http = response as? HTTPURLResponse else {
             throw APIError.transport(message: "Non-HTTP response")
         }
+
+        config.logging.logResponse(method: HTTPMethod.get.rawValue,
+                                   url: request.url ?? makeURL(path),
+                                   status: http.statusCode, body: data)
 
         if http.statusCode == 401 { emit(.tokenExpired) }
 
@@ -115,17 +123,31 @@ public final class URLSessionAPIClient: APIClient, @unchecked Sendable {
         body.appendString("\r\n--\(boundary)--\r\n")
         request.httpBody = body
 
+        // Multipart bodies contain raw image bytes — don't dump them.
+        // Log a synthetic placeholder showing the file size + fields.
+        let placeholder = "<multipart \(fileData.count)B file=\(fileName) " +
+            "fields=\(fields.keys.sorted().joined(separator: ","))>"
+        config.logging.logRequest(method: HTTPMethod.post.rawValue,
+                                  url: request.url ?? makeURL(path),
+                                  body: placeholder.data(using: .utf8))
+
         let data: Data
         let response: URLResponse
         do {
             (data, response) = try await session.data(for: request)
         } catch {
+            config.logging.logTransportError(method: HTTPMethod.post.rawValue,
+                                             url: request.url ?? makeURL(path),
+                                             error: error)
             throw APIError.fromTransport(error)
         }
 
         guard let http = response as? HTTPURLResponse else {
             throw APIError.transport(message: "Non-HTTP response")
         }
+        config.logging.logResponse(method: HTTPMethod.post.rawValue,
+                                   url: request.url ?? makeURL(path),
+                                   status: http.statusCode, body: data)
         if http.statusCode == 401 { emit(.tokenExpired) }
         guard (200..<300).contains(http.statusCode) else {
             throw APIError.fromResponse(
@@ -158,18 +180,24 @@ public final class URLSessionAPIClient: APIClient, @unchecked Sendable {
         if let body {
             request.httpBody = try JSONEncoder().encode(AnyEncodable(body))
         }
+        let url = request.url ?? makeURL(path)
+        config.logging.logRequest(method: method.rawValue, url: url, body: request.httpBody)
 
         let data: Data
         let response: URLResponse
         do {
             (data, response) = try await session.data(for: request)
         } catch {
+            config.logging.logTransportError(method: method.rawValue, url: url, error: error)
             throw APIError.fromTransport(error)
         }
 
         guard let http = response as? HTTPURLResponse else {
             throw APIError.transport(message: "Non-HTTP response")
         }
+
+        config.logging.logResponse(method: method.rawValue, url: url,
+                                   status: http.statusCode, body: data)
 
         if http.statusCode == 401 { emit(.tokenExpired) }
 

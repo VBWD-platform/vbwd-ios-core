@@ -108,7 +108,9 @@ struct CartView: View {
                     .listRowBackground(theme.cardBackground)
                 }
             }
+            #if os(iOS)
             .listStyle(.insetGrouped)
+            #endif
             .scrollContentBackground(.hidden)
 
             checkoutButton

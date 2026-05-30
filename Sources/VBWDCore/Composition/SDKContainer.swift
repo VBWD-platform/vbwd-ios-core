@@ -17,6 +17,11 @@ public final class SDKContainer {
     public let themeManager: ThemeManager
     public let cart: Cart
     public let checkoutSources: CheckoutSourceRegistry
+    /// Shared event bus — handed to AuthSession so it can emit
+    /// `AppEvents.authLogin` (so plugins can defer auth-gated fetches)
+    /// and reused by PluginHost / DefaultPlatformSDK so plugin events flow
+    /// through the same channel.
+    public let events: EventBus
 
     /// - Parameters:
     ///   - baseURL: API base; defaults to `vbwd_config.json` → `defaultBaseURL`.
@@ -33,7 +38,9 @@ public final class SDKContainer {
         self.apiClient = URLSessionAPIClient(config: config, tokenProvider: provider)
         self.tokenStore = tokenStore ?? KeychainTokenStore()
         let service = DefaultAuthService(client: apiClient, store: self.tokenStore)
-        self.session = AuthSession(service: service)
+        let bus = DefaultEventBus(api: apiClient)
+        self.events = bus
+        self.session = AuthSession(service: service, events: bus)
         self.themeRegistry = ThemeRegistry()
         self.themeManager = ThemeManager(registry: themeRegistry)
         self.cart = Cart()
@@ -105,6 +112,7 @@ public final class SDKContainer {
         let loader = manifestLoader ?? RemotePluginManifestLoader(
             api: apiClient, path: manifestPath, fallback: fallback)
         return PluginHost(api: apiClient, apiConfig: config, manifestLoader: loader,
-                          plugins: plugins, cart: cart, checkoutSources: checkoutSources)
+                          plugins: plugins, cart: cart, checkoutSources: checkoutSources,
+                          events: events)
     }
 }
