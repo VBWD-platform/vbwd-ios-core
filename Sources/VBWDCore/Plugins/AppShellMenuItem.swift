@@ -15,12 +15,17 @@ public struct MenuItem: Sendable, Identifiable {
     /// Settings and the Store divider; `"store"` renders inside the Store
     /// section; `nil` (default) renders in the Plugin Items area at the bottom.
     public let section: String?
+    /// Live unread-style counter (S67.2). When set, the side menu renders a
+    /// red pill while `count > 0`. Default `nil` — zero impact on existing
+    /// items (the static `badge` string above is unchanged).
+    public let badgeProvider: BadgeProvider?
 
     public init(
         id: String,
         icon: String,
         title: String,
         badge: String? = nil,
+        badgeProvider: BadgeProvider? = nil,
         action: @escaping @Sendable () -> Void = {},
         routePath: String? = nil,
         requiredPermission: String? = nil,
@@ -31,6 +36,7 @@ public struct MenuItem: Sendable, Identifiable {
         self.icon = icon
         self.title = title
         self.badge = badge
+        self.badgeProvider = badgeProvider
         self.action = action
         self.routePath = routePath
         self.requiredPermission = requiredPermission

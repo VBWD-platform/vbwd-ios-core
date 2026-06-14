@@ -54,6 +54,10 @@ public final class AuthSession: ObservableObject {
     }
 
     public func signOut() async {
+        // Emit before the token is cleared so listeners doing best-effort
+        // authenticated calls (e.g. meinchat's device-token unregister,
+        // S67.2) still have a chance to carry the JWT.
+        events?.emit(AppEvents.authLogout, nil)
         await service.logout()
         state = .signedOut
     }

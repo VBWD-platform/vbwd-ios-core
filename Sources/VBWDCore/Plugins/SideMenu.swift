@@ -82,6 +82,7 @@ public struct SideMenu: View {
                             icon: item.icon,
                             title: item.title,
                             badge: item.badge,
+                            badgeProvider: item.badgeProvider,
                             action: {
                                 if let routePath = item.routePath {
                                     host.selectedRoute = routePath
@@ -122,6 +123,7 @@ public struct SideMenu: View {
                                 icon: item.icon,
                                 title: item.title,
                                 badge: item.badge,
+                                badgeProvider: item.badgeProvider,
                                 action: {
                                     if let routePath = item.routePath {
                                         host.selectedRoute = routePath

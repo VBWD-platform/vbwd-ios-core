@@ -33,6 +33,8 @@ public protocol PlatformSDK: AnyObject, Sendable {
     var api: APIClient { get }
     var apiConfig: APIClientConfig { get }
     var events: EventBus { get }
+    /// S67.2 — device-token relay + app-icon badge seam.
+    var notifications: NotificationsSDK { get }
 
     func addRoute(_ route: PluginRoute) throws
     func getRoutes() -> [PluginRoute]
@@ -77,6 +79,7 @@ public final class DefaultPlatformSDK: PlatformSDK, @unchecked Sendable {
     public let menuItems: MenuItemRegistry  // Sprint 03
     public let cart: Cart                   // Sprint 06c
     public let checkoutSources: CheckoutSourceRegistry  // Sprint 06c
+    public let notifications: NotificationsSDK          // Sprint 67.2
 
     public init(api: APIClient,
                 apiConfig: APIClientConfig,
@@ -87,7 +90,8 @@ public final class DefaultPlatformSDK: PlatformSDK, @unchecked Sendable {
                 localizations: LocalizationRegistry = LocalizationRegistry(),
                 menuItems: MenuItemRegistry = MenuItemRegistry(),
                 cart: Cart,
-                checkoutSources: CheckoutSourceRegistry) {
+                checkoutSources: CheckoutSourceRegistry,
+                notifications: NotificationsSDK? = nil) {
         self.api = api
         self.apiConfig = apiConfig
         self.events = events
@@ -98,6 +102,7 @@ public final class DefaultPlatformSDK: PlatformSDK, @unchecked Sendable {
         self.menuItems = menuItems
         self.cart = cart
         self.checkoutSources = checkoutSources
+        self.notifications = notifications ?? DefaultNotificationsSDK()
     }
 
     public func addRoute(_ route: PluginRoute) throws { try routes.add(route) }

@@ -51,6 +51,9 @@ func runAll() async -> Int32 {
     registerCartAndCheckoutSourceSuites(runner)    // 6.2
     registerInvoiceDetailSuites(runner)            // 6.3
 
+    // Sprint 67.2 — notifications, device-token relay, menu badge
+    registerNotificationsSuites(runner)
+
     return await runner.run()
 }
 

@@ -18,6 +18,7 @@ public struct PluginMenuItems: View {
                 icon: item.icon,
                 title: item.title,
                 badge: item.badge,
+                badgeProvider: item.badgeProvider,
                 action: {
                     if let routePath = item.routePath {
                         host.selectedRoute = routePath

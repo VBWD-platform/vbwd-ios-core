@@ -23,14 +23,18 @@ public final class PluginHost: ObservableObject {
                 plugins: [Plugin],
                 cart: Cart = Cart(),
                 checkoutSources: CheckoutSourceRegistry = CheckoutSourceRegistry(),
-                events: EventBus? = nil) {
+                events: EventBus? = nil,
+                notifications: NotificationsSDK? = nil) {
         // Reuse the host-provided bus when given (so AuthSession + plugins
         // share one channel — `AppEvents.authLogin` reaches subscribers);
-        // fall back to a fresh bus for legacy callers + tests.
+        // fall back to a fresh bus for legacy callers + tests. Same for the
+        // notifications seam (S67.2): production passes the container's
+        // shared instance so APNs tokens reach plugin sinks.
         let bus = events ?? DefaultEventBus(api: api)
         self.sdk = DefaultPlatformSDK(api: api, apiConfig: apiConfig,
                                       events: bus,
-                                      cart: cart, checkoutSources: checkoutSources)
+                                      cart: cart, checkoutSources: checkoutSources,
+                                      notifications: notifications)
         self.manifestLoader = manifestLoader
         self.plugins = plugins
     }

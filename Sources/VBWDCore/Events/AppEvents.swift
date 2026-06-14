@@ -43,11 +43,14 @@ public enum AppEvents {
     public static let wsDisconnected = "ws:disconnected"
     public static let wsMessage = "ws:message"
     public static let wsError = "ws:error"
+    // Meinchat — local-only nudges that drive inbox refresh on push arrival.
+    public static let meinChatMessageReceived = "meinchat:message-received"
 
     /// Local-only events excluded from backend forwarding (web exclusion list).
     public static let localOnly: Set<String> = [
         notificationShow, notificationHide,
         modalOpen, modalClose,
         loadingStart, loadingEnd,
+        meinChatMessageReceived,
     ]
 }

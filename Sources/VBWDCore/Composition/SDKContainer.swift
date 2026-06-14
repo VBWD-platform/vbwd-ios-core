@@ -22,6 +22,15 @@ public final class SDKContainer {
     /// and reused by PluginHost / DefaultPlatformSDK so plugin events flow
     /// through the same channel.
     public let events: EventBus
+    /// S67.2 — notifications seam. The process-wide shared instance: the
+    /// host app's `UIApplicationDelegate` posts APNs tokens into it (the
+    /// delegate exists outside this DI graph), and `makePluginHost` hands
+    /// the same instance to the plugin facade.
+    public let notifications: NotificationsSDK
+    /// The last plugin host built by `makePluginHost` (weak — AppRoot owns
+    /// it). Lets the host app's notification delegate route taps via
+    /// `selectedRoute` (S67.2 §3.8).
+    public private(set) weak var pluginHost: PluginHost?
 
     /// - Parameters:
     ///   - baseURL: API base; defaults to `vbwd_config.json` → `defaultBaseURL`.
@@ -40,6 +49,7 @@ public final class SDKContainer {
         let service = DefaultAuthService(client: apiClient, store: self.tokenStore)
         let bus = DefaultEventBus(api: apiClient)
         self.events = bus
+        self.notifications = DefaultNotificationsSDK.shared
         self.session = AuthSession(service: service, events: bus)
         self.themeRegistry = ThemeRegistry()
         self.themeManager = ThemeManager(registry: themeRegistry)
@@ -111,8 +121,10 @@ public final class SDKContainer {
                                fallback: PluginManifest = .empty) -> PluginHost {
         let loader = manifestLoader ?? RemotePluginManifestLoader(
             api: apiClient, path: manifestPath, fallback: fallback)
-        return PluginHost(api: apiClient, apiConfig: config, manifestLoader: loader,
-                          plugins: plugins, cart: cart, checkoutSources: checkoutSources,
-                          events: events)
+        let host = PluginHost(api: apiClient, apiConfig: config, manifestLoader: loader,
+                              plugins: plugins, cart: cart, checkoutSources: checkoutSources,
+                              events: events, notifications: notifications)
+        self.pluginHost = host
+        return host
     }
 }
