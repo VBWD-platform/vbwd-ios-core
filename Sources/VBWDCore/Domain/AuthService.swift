@@ -14,6 +14,18 @@ public protocol AuthService: AnyObject, Sendable {
     func fetchProfile() async throws -> AuthUser
     /// Deferred to Sprint 02 — throws `.notImplemented`.
     func refreshAccessToken() async throws -> String
+    /// Returns the persisted access token (S91). Plugins use this when
+    /// they need to forward the JWT outside the normal `APIClient`
+    /// request path — e.g. seeding a `WKWebView`'s `localStorage` so an
+    /// embedded web app shares the user's session.
+    func currentToken() -> String?
+}
+
+public extension AuthService {
+    /// Back-compat default — plugins built before S91 still satisfy
+    /// the protocol without recompiling. Returns nil so the caller
+    /// degrades to logged-out behaviour gracefully.
+    func currentToken() -> String? { nil }
 }
 
 /// Default `AuthService`. Depends only on injected protocols (DIP); holds no
@@ -79,5 +91,9 @@ public final class DefaultAuthService: AuthService, @unchecked Sendable {
 
     public func refreshAccessToken() async throws -> String {
         throw APIError.notImplemented("token refresh deferred to Sprint 02")
+    }
+
+    public func currentToken() -> String? {
+        try? store.loadToken()
     }
 }

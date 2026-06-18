@@ -75,5 +75,70 @@ func registerCompositionSuites(_ runner: TestRunner) {
             let result = VBWDConfig.load()
             s.expectNil(result)
         }
+
+        // MARK: S91 — CMS posts browser keys + derived URLs
+        await s.test("S91_decode_populatesIosCmsKeys") {
+            let json = """
+            {
+                "api_base_url": "https://vbwd.cc/api/v1",
+                "root_ios_category_on_host": "news",
+                "root_ios_post_type_on_host": "post"
+            }
+            """
+            let config = try JSONDecoder().decode(VBWDConfig.self,
+                                                  from: Data(json.utf8))
+            s.expectEqual(config.rootIosCategoryOnHost, "news")
+            s.expectEqual(config.rootIosPostTypeOnHost, "post")
+        }
+
+        await s.test("S91_decode_keysOptional_backCompat") {
+            // A pre-S91 config without the two iOS keys still loads.
+            let json = #"{"api_base_url":"http://localhost:5000/api/v1"}"#
+            let config = try JSONDecoder().decode(VBWDConfig.self,
+                                                  from: Data(json.utf8))
+            s.expectNil(config.rootIosCategoryOnHost)
+            s.expectNil(config.rootIosPostTypeOnHost)
+        }
+
+        await s.test("S91_webOrigin_stripsApiV1") {
+            let config = VBWDConfig(apiBaseUrl: "https://vbwd.cc/api/v1")
+            s.expectEqual(config.webOrigin?.absoluteString, "https://vbwd.cc")
+        }
+
+        await s.test("S91_webOrigin_explicitOverrideWins") {
+            // Split-host dev: backend on :5000, fe-user on :8080. The
+            // explicit `web_base_url` must win — derive-from-api would
+            // land on the wrong port.
+            let config = VBWDConfig(
+                apiBaseUrl: "http://localhost:5000/api/v1",
+                webBaseUrl: "http://localhost:8080")
+            s.expectEqual(config.webOrigin?.absoluteString, "http://localhost:8080")
+        }
+
+        await s.test("S91_webOrigin_stripsApiVersionGeneric") {
+            // /api/v2 also stripped — keeps the helper future-proof.
+            let config = VBWDConfig(apiBaseUrl: "https://example.test/api/v2")
+            s.expectEqual(config.webOrigin?.absoluteString, "https://example.test")
+        }
+
+        await s.test("S91_cmsArchiveURL_requiresBothKeys") {
+            // Neither key set → nil.
+            s.expectNil(VBWDConfig(apiBaseUrl: "https://vbwd.cc/api/v1")
+                .cmsArchiveURL)
+            // Only one set → still nil (gate).
+            s.expectNil(VBWDConfig(apiBaseUrl: "https://vbwd.cc/api/v1",
+                                   rootIosCategoryOnHost: "news").cmsArchiveURL)
+            s.expectNil(VBWDConfig(apiBaseUrl: "https://vbwd.cc/api/v1",
+                                   rootIosPostTypeOnHost: "post").cmsArchiveURL)
+        }
+
+        await s.test("S91_cmsArchiveURL_buildsEmbedPath") {
+            let config = VBWDConfig(
+                apiBaseUrl: "https://vbwd.cc/api/v1",
+                rootIosCategoryOnHost: "news",
+                rootIosPostTypeOnHost: "video")
+            s.expectEqual(config.cmsArchiveURL?.absoluteString,
+                          "https://vbwd.cc/cms/embed/video/news")
+        }
     }
 }

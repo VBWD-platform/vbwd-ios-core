@@ -31,6 +31,15 @@ public final class AuthSession: ObservableObject {
         return nil
     }
 
+    /// Current access token, if the session is authenticated. Plugins
+    /// use this when they need to forward the JWT outside the normal
+    /// `APIClient` request path — e.g. the S91 CMS plugin seeds it
+    /// into a `WKWebView`'s `localStorage` so the embedded web app
+    /// shares the user's session.
+    public var accessToken: String? {
+        service.currentToken()
+    }
+
     /// Web `initAuth`: restore persisted session on app start.
     public func start() {
         if let user = service.restore() {
