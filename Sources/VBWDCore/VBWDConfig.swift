@@ -32,6 +32,13 @@ public struct VBWDConfig: Codable, Equatable, Sendable {
     /// where stripping `/api/vX` from `apiBaseUrl` gives the right
     /// host. `webOrigin` prefers this key when present.
     public let webBaseUrl: String?
+    /// S92 — CMS page slug the shop landing pulls its title / intro
+    /// from. Optional; defaults to `"shop"` in the shop plugin when
+    /// absent.
+    public let rootIosShopHomeSlug: String?
+    /// S92 — optional root category slug; when set, the shop home and
+    /// category navigator scope to descendants of this category.
+    public let rootIosShopRootCatSlug: String?
 
     enum CodingKeys: String, CodingKey {
         case apiBaseUrl = "api_base_url"
@@ -39,18 +46,24 @@ public struct VBWDConfig: Codable, Equatable, Sendable {
         case rootIosCategoryOnHost = "root_ios_category_on_host"
         case rootIosPostTypeOnHost = "root_ios_post_type_on_host"
         case webBaseUrl = "web_base_url"
+        case rootIosShopHomeSlug = "root_ios_shop_home_slug"
+        case rootIosShopRootCatSlug = "root_ios_shop_root_cat_slug"
     }
 
     public init(apiBaseUrl: String,
                 tarifPlanRootCatSlug: String? = nil,
                 rootIosCategoryOnHost: String? = nil,
                 rootIosPostTypeOnHost: String? = nil,
-                webBaseUrl: String? = nil) {
+                webBaseUrl: String? = nil,
+                rootIosShopHomeSlug: String? = nil,
+                rootIosShopRootCatSlug: String? = nil) {
         self.apiBaseUrl = apiBaseUrl
         self.tarifPlanRootCatSlug = tarifPlanRootCatSlug
         self.rootIosCategoryOnHost = rootIosCategoryOnHost
         self.rootIosPostTypeOnHost = rootIosPostTypeOnHost
         self.webBaseUrl = webBaseUrl
+        self.rootIosShopHomeSlug = rootIosShopHomeSlug
+        self.rootIosShopRootCatSlug = rootIosShopRootCatSlug
     }
 
     /// Parsed `apiBaseUrl` as a `URL`. Falls back to `SDKContainer.defaultBaseURL`

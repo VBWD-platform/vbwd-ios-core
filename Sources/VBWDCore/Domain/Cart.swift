@@ -6,11 +6,30 @@ import Foundation
 /// the iOS cart is not localStorage-persisted — it lives for the session.
 @MainActor
 public final class Cart: ObservableObject {
-    @Published public private(set) var items: [CartItem] = []
+    @Published public private(set) var items: [CartItem] = [] {
+        didSet { notifyObservers() }
+    }
 
     /// Incremented each time a view requests the cart checkout sheet to open.
     /// AppRoot observes this via `onChange` and presents the sheet.
     @Published public var checkoutRequestCount = 0
+
+    /// Non-SwiftUI listeners (`MenuItem.badgeProvider` updaters, etc.) so
+    /// plugins can mirror cart state into their own observables without
+    /// pulling in Combine (S92). Always called on the main actor.
+    private var observers: [([CartItem]) -> Void] = []
+
+    /// Register a closure called on every cart mutation. The closure
+    /// fires once immediately with the current items so callers don't
+    /// need a separate priming step.
+    public func observe(_ closure: @escaping ([CartItem]) -> Void) {
+        observers.append(closure)
+        closure(items)
+    }
+
+    private func notifyObservers() {
+        for observer in observers { observer(items) }
+    }
 
     /// Call to request opening the cart checkout sheet from any view.
     public func requestCheckout() {
