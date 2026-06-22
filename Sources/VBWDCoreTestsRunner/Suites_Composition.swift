@@ -140,5 +140,43 @@ func registerCompositionSuites(_ runner: TestRunner) {
             s.expectEqual(config.cmsArchiveURL?.absoluteString,
                           "https://vbwd.cc/cms/embed/video/news")
         }
+
+        // MARK: S92 — shop hybrid home
+
+        await s.test("S92_shopHomeCmsPageURL_nilWhenFlagOff") {
+            let config = VBWDConfig(
+                apiBaseUrl: "https://vbwd.cc/api/v1",
+                rootIosShopHomeSlug: "shop")
+            s.expectNil(config.shopHomeCmsPageURL,
+                        "Flag must be true to activate the WebView render.")
+        }
+
+        await s.test("S92_shopHomeCmsPageURL_nilWhenSlugMissing") {
+            let config = VBWDConfig(
+                apiBaseUrl: "https://vbwd.cc/api/v1",
+                rootIosShopHomeRendersCmsPage: true)
+            s.expectNil(config.shopHomeCmsPageURL,
+                        "Flag + slug are both required.")
+        }
+
+        await s.test("S92_shopHomeCmsPageURL_buildsEmbedPagePath") {
+            let config = VBWDConfig(
+                apiBaseUrl: "https://vbwd.cc/api/v1",
+                rootIosShopHomeSlug: "storefront",
+                rootIosShopHomeRendersCmsPage: true)
+            s.expectEqual(config.shopHomeCmsPageURL?.absoluteString,
+                          "https://vbwd.cc/cms/embed/page/post/storefront")
+        }
+
+        await s.test("S92_shopHomeCmsPageURL_respectsWebBaseUrlOverride") {
+            // Split-host dev — explicit web base wins.
+            let config = VBWDConfig(
+                apiBaseUrl: "http://localhost:5000/api/v1",
+                webBaseUrl: "http://localhost:8080",
+                rootIosShopHomeSlug: "storefront",
+                rootIosShopHomeRendersCmsPage: true)
+            s.expectEqual(config.shopHomeCmsPageURL?.absoluteString,
+                          "http://localhost:8080/cms/embed/page/post/storefront")
+        }
     }
 }

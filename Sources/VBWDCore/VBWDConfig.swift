@@ -39,6 +39,11 @@ public struct VBWDConfig: Codable, Equatable, Sendable {
     /// S92 — optional root category slug; when set, the shop home and
     /// category navigator scope to descendants of this category.
     public let rootIosShopRootCatSlug: String?
+    /// S92 hybrid — when true, the shop home renders a `WKWebView`
+    /// pointed at the CMS embed page identified by
+    /// `rootIosShopHomeSlug`, instead of the native featured grid.
+    /// Defaults to nil / false → native grid (back-compat).
+    public let rootIosShopHomeRendersCmsPage: Bool?
 
     enum CodingKeys: String, CodingKey {
         case apiBaseUrl = "api_base_url"
@@ -48,6 +53,7 @@ public struct VBWDConfig: Codable, Equatable, Sendable {
         case webBaseUrl = "web_base_url"
         case rootIosShopHomeSlug = "root_ios_shop_home_slug"
         case rootIosShopRootCatSlug = "root_ios_shop_root_cat_slug"
+        case rootIosShopHomeRendersCmsPage = "root_ios_shop_home_renders_cms_page"
     }
 
     public init(apiBaseUrl: String,
@@ -56,7 +62,8 @@ public struct VBWDConfig: Codable, Equatable, Sendable {
                 rootIosPostTypeOnHost: String? = nil,
                 webBaseUrl: String? = nil,
                 rootIosShopHomeSlug: String? = nil,
-                rootIosShopRootCatSlug: String? = nil) {
+                rootIosShopRootCatSlug: String? = nil,
+                rootIosShopHomeRendersCmsPage: Bool? = nil) {
         self.apiBaseUrl = apiBaseUrl
         self.tarifPlanRootCatSlug = tarifPlanRootCatSlug
         self.rootIosCategoryOnHost = rootIosCategoryOnHost
@@ -64,6 +71,7 @@ public struct VBWDConfig: Codable, Equatable, Sendable {
         self.webBaseUrl = webBaseUrl
         self.rootIosShopHomeSlug = rootIosShopHomeSlug
         self.rootIosShopRootCatSlug = rootIosShopRootCatSlug
+        self.rootIosShopHomeRendersCmsPage = rootIosShopHomeRendersCmsPage
     }
 
     /// Parsed `apiBaseUrl` as a `URL`. Falls back to `SDKContainer.defaultBaseURL`
@@ -108,6 +116,24 @@ public struct VBWDConfig: Codable, Equatable, Sendable {
             return nil
         }
         return webOrigin.appendingPathComponent("cms/embed/\(type)/\(category)")
+    }
+
+    /// URL the shop home loads when `rootIosShopHomeRendersCmsPage` is
+    /// true. Returns `nil` when either the flag is off or the inputs
+    /// can't compose into a valid URL — the shop plugin treats that as
+    /// "fall back to the native grid" (S92 hybrid).
+    public var shopHomeCmsPageURL: URL? {
+        guard rootIosShopHomeRendersCmsPage == true,
+              let webOrigin,
+              let slug = rootIosShopHomeSlug, !slug.isEmpty else {
+            return nil
+        }
+        // Mirrors S91's single-page embed shape:
+        // `<webOrigin>/cms/embed/<type>/post/<slug>`. Post-type is
+        // hard-coded `page` because the shop home is a CMS page (not a
+        // category archive).
+        return webOrigin
+            .appendingPathComponent("cms/embed/page/post/\(slug)")
     }
 
     /// Loads config from a bundled `vbwd_config.json` in the given bundle.
