@@ -27,8 +27,10 @@ public protocol APIClient: AnyObject, Sendable {
     func getData(_ path: String) async throws -> Data
 
     /// Multipart file upload. Sends the file as `multipart/form-data` with
-    /// the field name `"file"` and additional text fields from `fields`.
-    func upload<R: Decodable>(_ path: String, fileData: Data, fileName: String,
+    /// the given `fileFieldName` and additional text fields from `fields`.
+    func upload<R: Decodable>(_ path: String,
+                               fileFieldName: String,
+                               fileData: Data, fileName: String,
                                mimeType: String, fields: [String: String]) async throws -> R
 
     /// Set/clear the bearer token (web `setToken`/`clearToken`).
@@ -48,8 +50,21 @@ public extension APIClient {
     func getData(_ path: String) async throws -> Data {
         throw APIError.transport(message: "getData not supported")
     }
-    func upload<R: Decodable>(_ path: String, fileData: Data, fileName: String,
+    func upload<R: Decodable>(_ path: String,
+                               fileFieldName: String,
+                               fileData: Data, fileName: String,
                                mimeType: String, fields: [String: String]) async throws -> R {
         throw APIError.transport(message: "upload not supported")
+    }
+
+    /// Convenience overload defaulting the multipart file field name to `"file"`.
+    func upload<R: Decodable>(_ path: String, fileData: Data, fileName: String,
+                               mimeType: String, fields: [String: String]) async throws -> R {
+        try await upload(path,
+                         fileFieldName: "file",
+                         fileData: fileData,
+                         fileName: fileName,
+                         mimeType: mimeType,
+                         fields: fields)
     }
 }

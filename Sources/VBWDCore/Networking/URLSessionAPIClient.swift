@@ -96,7 +96,9 @@ public final class URLSessionAPIClient: APIClient, @unchecked Sendable {
 
     // MARK: - Multipart Upload
 
-    public func upload<R: Decodable>(_ path: String, fileData: Data, fileName: String,
+    public func upload<R: Decodable>(_ path: String,
+                                      fileFieldName: String,
+                                      fileData: Data, fileName: String,
                                       mimeType: String, fields: [String: String]) async throws -> R {
         let boundary = "Boundary-\(UUID().uuidString)"
         var request = URLRequest(url: makeURL(path))
@@ -117,7 +119,7 @@ public final class URLSessionAPIClient: APIClient, @unchecked Sendable {
             body.appendString("\(value)\r\n")
         }
         body.appendString("--\(boundary)\r\n")
-        body.appendString("Content-Disposition: form-data; name=\"file\"; filename=\"\(fileName)\"\r\n")
+        body.appendString("Content-Disposition: form-data; name=\"\(fileFieldName)\"; filename=\"\(fileName)\"\r\n")
         body.appendString("Content-Type: \(mimeType)\r\n\r\n")
         body.append(fileData)
         body.appendString("\r\n--\(boundary)--\r\n")
